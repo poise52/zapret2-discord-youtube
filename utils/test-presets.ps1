@@ -1,3 +1,7 @@
+param(
+    [switch]$AutoRun
+)
+
 # ===== ОБХОД ПОЛИТИКИ ВЫПОЛНЕНИЯ =====
 # Если скрипт запущен напрямую без -ExecutionPolicy Bypass, перезапуск с обходом
 if ($MyInvocation.Line -notmatch 'Bypass' -and $ExecutionContext.SessionState.LanguageMode -eq 'FullLanguage') {
@@ -5,7 +9,9 @@ if ($MyInvocation.Line -notmatch 'Bypass' -and $ExecutionContext.SessionState.La
     if ($currentPolicy -eq 'Restricted' -or $currentPolicy -eq 'AllSigned') {
         $scriptPath = $MyInvocation.MyCommand.Path
         if ($scriptPath) {
-            Start-Process powershell.exe -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$scriptPath`"" -Verb RunAs
+            $args_ = "-NoProfile -ExecutionPolicy Bypass -File `"$scriptPath`""
+            if ($AutoRun) { $args_ += " -AutoRun" }
+            Start-Process powershell.exe -ArgumentList $args_ -Verb RunAs
             exit
         }
     }
@@ -197,8 +203,10 @@ if (Get-Service -Name "zapret2" -ErrorAction SilentlyContinue) {
 
 if ($hasErrors) {
     Write-Host "`nИсправьте ошибки и перезапустите." -ForegroundColor Yellow
-    Write-Host "Нажмите любую клавишу..." -ForegroundColor Yellow
-    [void][System.Console]::ReadKey($true)
+    if (-not $AutoRun) {
+        Write-Host "Нажмите любую клавишу..." -ForegroundColor Yellow
+        [void][System.Console]::ReadKey($true)
+    }
     exit 1
 }
 
@@ -252,7 +260,12 @@ Write-Host ""
 Write-Host "Режим тестирования:" -ForegroundColor Cyan
 Write-Host "  [1] Все пресеты ($($presetFiles.Count) шт.)" -ForegroundColor Gray
 Write-Host "  [2] Выбрать конкретные" -ForegroundColor Gray
-$modeChoice = Read-Host "Выбор (1/2)"
+
+if ($AutoRun) {
+    $modeChoice = '1'
+} else {
+    $modeChoice = Read-Host "Выбор (1/2)"
+}
 
 if ($modeChoice -eq '2') {
     Write-Host ""
@@ -412,6 +425,15 @@ try {
     if ($bestPreset) {
         Write-Host ""
         Write-Host "  Лучший пресет: $bestPreset" -ForegroundColor Green
+        if ($AutoRun) {
+            $activePresetPath = Join-Path $utilsDir "preset-active.txt"
+            $stateFile = Join-Path $utilsDir "current_preset.txt"
+            $bestPresetFile = Join-Path $presetsDir "$bestPreset.txt"
+            
+            Copy-Item -Path $bestPresetFile -Destination $activePresetPath -Force
+            $bestPreset | Out-File -FilePath $stateFile -Encoding UTF8 -NoNewline
+            Write-Host "  [AUTO] Пресет $bestPreset установлен как активный." -ForegroundColor Magenta
+        }
     }
 
     # Сохранение результатов
@@ -481,6 +503,8 @@ try {
     }
 }
 
-Write-Host ""
-Write-Host "Нажмите любую клавишу..." -ForegroundColor Yellow
-[void][System.Console]::ReadKey($true)
+if (-not $AutoRun) {
+    Write-Host ""
+    Write-Host "Нажмите любую клавишу..." -ForegroundColor Yellow
+    [void][System.Console]::ReadKey($true)
+}
