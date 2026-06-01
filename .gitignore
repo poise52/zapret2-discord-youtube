@@ -1,0 +1,25 @@
+# Результаты тестов и временные логи
+/utils/test-results/
+/utils/test results/
+*.log
+
+# Временные скрипты и сгенерированные файлы
+/utils/verify_presets.py
+/utils/copy_presets.py
+/utils/copy_presets.sh
+/zapret2-task.xml
+
+# Активные настройки запуска
+/utils/preset-active.txt
+/utils/current_preset.txt
+
+# Пользовательские списки (если они создаются локально)
+/lists/list-general-user.txt
+/lists/list-exclude-user.txt
+/lists/ipset-exclude-user.txt
+
+# Системные файлы
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

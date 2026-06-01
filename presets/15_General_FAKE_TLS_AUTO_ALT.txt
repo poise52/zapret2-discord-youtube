@@ -1,9 +1,6 @@
-# Preset: 01_Default
-# ActivePreset: 01_Default
+# Preset: 15_General_FAKE_TLS_AUTO_ALT
+# ActivePreset: 15_General_FAKE_TLS_AUTO_ALT
 # BuiltinVersion: 2.11
-# Created: 2026-01-30T14:17:56.182141
-# Modified: 2026-01-30T14:47:35.144031
-# Description: 
 
 --lua-init=@lua/zapret-lib.lua
 --lua-init=@lua/zapret-antidpi.lua
@@ -15,13 +12,6 @@
 --ctrack-disable=0
 --ipcache-lifetime=8400
 --ipcache-hostname=1
-
---wf-tcp-out=80,443-65535
---wf-udp-out=80,443-65535
-
---wf-raw-part=@windivert.filter/windivert_part.discord_media.txt
---wf-raw-part=@windivert.filter/windivert_part.stun.txt
---wf-raw-part=@windivert.filter/windivert_part.wireguard.txt
 
 --blob=tls_google:@bin/tls_clienthello_www_google_com.bin
 --blob=tls1:@bin/tls_clienthello_1.bin
@@ -83,17 +73,81 @@
 --blob=hex_0f0f0f0f:0x0F0F0F0F
 --blob=hex_00:0x00
 
---filter-tcp=80,443-65535
---ipset-exclude=lists/ipset-ru.txt
---out-range=-d7
---lua-desync=send:repeats=2
---lua-desync=syndata:blob=stun_pat:repeats=2
---lua-desync=tls_multisplit_sni:seqovl=652:seqovl_pattern=stun_pat:ip_autottl=-3,3-20:ip6_autottl=-3,3-20
+--wf-tcp-out=80,443,2053,2083,2087,2096,8443
+--wf-udp-out=443,19294-19344,50000-50100
+--wf-raw-part=@windivert.filter/windivert_part.discord_media.txt
+--wf-raw-part=@windivert.filter/windivert_part.stun.txt
+--wf-raw-part=@windivert.filter/windivert_part.wireguard.txt
+
+--filter-udp=443
+--ipset-exclude=lists/ipset-exclude.txt
+--lua-desync=fake:blob=quic_google:repeats=11
 
 --new
 
---filter-udp=80,443-65535
---ipset-exclude=lists/ipset-ru.txt
+--filter-l7=discord,stun
+--payload=stun,discord_ip_discovery
+--lua-desync=fake:blob=fake_default_udp:repeats=6
+
+--new
+
+--filter-tcp=80,443,1080,2053,2083,2087,2096,8443
+--hostlist-domains=discord.media
+--lua-desync=fake:blob=fake_default_tls:tls_mod=rnd,dupsid,sni=www.google.com:repeats=8:tcp_seq=2
+--lua-desync=fakedsplit:pos=2:repeats=8:tcp_seq=2
+
+--new
+
+--filter-tcp=80,443
+--hostlist-domains=googlevideo.com
 --out-range=-d8
---payload=all
---lua-desync=fake:blob=quic_google:ip_autottl=-2,3-20:ip6_autottl=-2,3-20:repeats=10:payload=all
+--lua-desync=fake:blob=fake_default_tls:tls_mod=rnd,dupsid,sni=www.google.com:repeats=8:tcp_seq=2
+--lua-desync=fakedsplit:pos=2:repeats=8:tcp_seq=2
+
+--new
+
+--filter-tcp=80,443
+--hostlist=lists/youtube.txt
+--out-range=-d8
+--lua-desync=fake:blob=fake_default_tls:tls_mod=rnd,dupsid,sni=www.google.com:repeats=8:tcp_seq=2
+--lua-desync=fakedsplit:pos=2:repeats=8:tcp_seq=2
+
+--new
+
+--filter-tcp=80,443,1080,2053,2083,2087,2096,8443
+--hostlist=lists/discord.txt
+--hostlist=lists/other.txt
+--hostlist=lists/soundcloud.txt
+--hostlist=lists/rutracker.txt
+--hostlist=lists/rutor.txt
+--hostlist=lists/roblox.txt
+--hostlist=lists/itch.txt
+--hostlist=lists/facebook.txt
+--hostlist=lists/instagram.txt
+--hostlist=lists/twitter.txt
+--hostlist=lists/whatsapp.txt
+--out-range=-d10
+--lua-desync=fake:blob=fake_default_tls:tls_mod=rnd,dupsid,sni=www.google.com:repeats=8:tcp_seq=2
+--lua-desync=fakedsplit:pos=2:repeats=8:tcp_seq=2
+
+--new
+
+--filter-tcp=80,443
+--ipset-exclude=lists/ipset-exclude.txt
+--lua-desync=fake:blob=fake_default_tls:tls_mod=rnd,dupsid,sni=www.google.com:repeats=8:tcp_seq=2
+--lua-desync=fakedsplit:pos=2:repeats=8:tcp_seq=2
+
+--new
+
+--filter-udp=443
+--ipset=lists/ipset-all.txt
+--ipset-exclude=lists/ipset-exclude.txt
+--lua-desync=fake:blob=quic_google:repeats=11
+
+--new
+
+--filter-tcp=80,443
+--ipset=lists/ipset-all.txt
+--ipset-exclude=lists/ipset-exclude.txt
+--lua-desync=fake:blob=fake_default_tls:tls_mod=rnd,dupsid,sni=www.google.com:repeats=8:tcp_seq=2
+--lua-desync=fakedsplit:pos=2:repeats=8:tcp_seq=2

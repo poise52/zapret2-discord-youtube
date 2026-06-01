@@ -1,8 +1,8 @@
-# Preset: 01_Default
-# ActivePreset: 01_Default
+# Preset: 21_Rostelecom
+# ActivePreset: 21_Rostelecom
 # BuiltinVersion: 2.11
-# Created: 2026-01-30T14:17:56.182141
-# Modified: 2026-01-30T14:47:35.144031
+# Created: 2026-02-06T14:19:01.572248
+# Modified: 2026-02-06T14:19:01.572930
 # Description: 
 
 --lua-init=@lua/zapret-lib.lua
@@ -16,8 +16,8 @@
 --ipcache-lifetime=8400
 --ipcache-hostname=1
 
---wf-tcp-out=80,443-65535
---wf-udp-out=80,443-65535
+--wf-tcp-out=80,443,1080,2053,2083,2087,2096,8443
+--wf-udp-out=80,443,5000-65535
 
 --wf-raw-part=@windivert.filter/windivert_part.discord_media.txt
 --wf-raw-part=@windivert.filter/windivert_part.stun.txt
@@ -83,17 +83,79 @@
 --blob=hex_0f0f0f0f:0x0F0F0F0F
 --blob=hex_00:0x00
 
---filter-tcp=80,443-65535
---ipset-exclude=lists/ipset-ru.txt
---out-range=-d7
---lua-desync=send:repeats=2
---lua-desync=syndata:blob=stun_pat:repeats=2
---lua-desync=tls_multisplit_sni:seqovl=652:seqovl_pattern=stun_pat:ip_autottl=-3,3-20:ip6_autottl=-3,3-20
+--filter-tcp=80,443
+--hostlist-domains=googlevideo.com
+--out-range=-d8
+--lua-desync=multidisorder:pos=1,host+2,sld+2,sld+5,sniext+1,sniext+2,endhost-2:seqovl=1
 
 --new
 
---filter-udp=80,443-65535
---ipset-exclude=lists/ipset-ru.txt
+--filter-tcp=80,443
+--hostlist=lists/youtube.txt
 --out-range=-d8
+--lua-desync=multidisorder:pos=1,host+2,sld+2,sld+5,sniext+1,sniext+2,endhost-2:seqovl=1
+
+--new
+
+--filter-udp=443
+--ipset=lists/ipset-youtube.txt
+--out-range=-n8
+--payload=all
+--lua-desync=fake:blob=quic_google:repeats=2
+
+--new
+
+--filter-l7=stun,discord
+--payload=stun,discord_ip_discovery
+--out-range=-n8
+--lua-desync=fake:blob=quic_google:ip_autottl=-2,3-20:ip6_autottl=-2,3-20:repeats=10:payload=all
+
+--new
+
+--filter-tcp=443
+--hostlist-exclude=lists/netrogat.txt
+--hostlist=lists/other.txt
+--hostlist=lists/russia-blacklist.txt
+--out-range=-d10
+--lua-desync=syndata
+--lua-desync=multidisorder_legacy:pos=1,midsld
+
+--filter-tcp=80,443,444-65535
+--ipset=lists/ipset-all.txt
+--ipset=lists/ipset-base.txt
+--ipset=lists/ipset-discord.txt
+--ipset=lists/ipset-cloudflare.txt
+--ipset=lists/cloudflare-ipset.txt
+--ipset=lists/cloudflare-ipset_v6.txt
+--ipset=lists/ipset-cloudflare1.txt
+--ipset=lists/ipset-amazon.txt
+--ipset=lists/ipset-roblox.txt
+--ipset=lists/ipset-lol-ru.txt
+--ipset=lists/ipset-lol-euw.txt
+--ipset=lists/ipset-ovh.txt
+--ipset=lists/ipset-whatsapp.txt
+--ipset=lists/ipset-warp.txt
+--out-range=-d10
+--lua-desync=syndata
+--lua-desync=multidisorder_legacy:pos=1,midsld
+
+--new
+
+--filter-udp=444-65535
+--ipset=lists/ipset-all.txt
+--ipset=lists/ipset-base.txt
+--ipset=lists/ipset-discord.txt
+--ipset=lists/ipset-cloudflare.txt
+--ipset=lists/cloudflare-ipset.txt
+--ipset=lists/cloudflare-ipset_v6.txt
+--ipset=lists/ipset-cloudflare1.txt
+--ipset=lists/ipset-amazon.txt
+--ipset=lists/ipset-roblox.txt
+--ipset=lists/ipset-lol-ru.txt
+--ipset=lists/ipset-lol-euw.txt
+--ipset=lists/ipset-ovh.txt
+--ipset=lists/ipset-whatsapp.txt
+--ipset=lists/ipset-warp.txt
+--out-range=-n8
 --payload=all
 --lua-desync=fake:blob=quic_google:ip_autottl=-2,3-20:ip6_autottl=-2,3-20:repeats=10:payload=all
