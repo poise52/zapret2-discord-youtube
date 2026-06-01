@@ -1,4 +1,4 @@
-﻿# ===== ОБХОД ПОЛИТИКИ ВЫПОЛНЕНИЯ =====
+# ===== ОБХОД ПОЛИТИКИ ВЫПОЛНЕНИЯ =====
 # Если скрипт запущен напрямую без -ExecutionPolicy Bypass, перезапуск с обходом
 if ($MyInvocation.Line -notmatch 'Bypass' -and $ExecutionContext.SessionState.LanguageMode -eq 'FullLanguage') {
     $currentPolicy = Get-ExecutionPolicy -Scope Process
@@ -417,33 +417,33 @@ try {
     # Сохранение результатов
     $dateStr = Get-Date -Format "yyyy-MM-dd_HH-mm-ss"
     $resultFile = Join-Path $resultsDir "test_$dateStr.txt"
-    $lines = @("Zapret2 Preset Test - $dateStr", "=" * 60, "")
+    $reportLines = @("Zapret2 Preset Test - $dateStr", "=" * 60, "")
 
     foreach ($res in $globalResults) {
-        $lines += "Пресет: $($res.Preset)"
+        $reportLines += "Пресет: $($res.Preset)"
         if ($res.Failed) {
-            $lines += "  РЕЗУЛЬТАТ: НЕ ЗАПУСТИЛСЯ"
+            $reportLines += "  РЕЗУЛЬТАТ: НЕ ЗАПУСТИЛСЯ"
         } else {
             foreach ($tr in $res.Results) {
                 $http = ($tr.HttpTokens -join ' ').Trim()
-                $lines += "  $($tr.Name): $http | Ping: $($tr.PingResult)"
+                $reportLines += "  $($tr.Name): $http | Ping: $($tr.PingResult)"
             }
         }
-        $lines += ""
+        $reportLines += ""
     }
 
-    $lines += "=== АНАЛИТИКА ==="
+    $reportLines += "=== АНАЛИТИКА ==="
     foreach ($name in $analytics.Keys) {
         $a = $analytics[$name]
         if ($a.LaunchFail) {
-            $lines += "$name : НЕ ЗАПУСТИЛСЯ"
+            $reportLines += "$name : НЕ ЗАПУСТИЛСЯ"
         } else {
-            $lines += "$name : OK=$($a.OK) FAIL=$($a.FAIL) UNSUP=$($a.UNSUP) Ping=$($a.PingOK)/$($a.PingOK + $a.PingFail)"
+            $reportLines += "$name : OK=$($a.OK) FAIL=$($a.FAIL) UNSUP=$($a.UNSUP) Ping=$($a.PingOK)/$($a.PingOK + $a.PingFail)"
         }
     }
-    if ($bestPreset) { $lines += "`nЛучший пресет: $bestPreset" }
+    if ($bestPreset) { $reportLines += "`nЛучший пресет: $bestPreset" }
 
-    $lines | Out-File -FilePath $resultFile -Encoding UTF8
+    $reportLines | Out-File -FilePath $resultFile -Encoding UTF8
     Write-Host ""
     Write-Host "  Результаты сохранены: $resultFile" -ForegroundColor Green
 
