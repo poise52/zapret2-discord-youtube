@@ -53,8 +53,8 @@ fn generate_log_path(root: &PathBuf, prefix: &str) -> String {
 fn start_proxy(app: tauri::AppHandle) -> Result<String, String> {
     let root = get_zapret_root(&app)?;
     
-    let winws_path = root.join("bin").join("winws2.exe").to_string_lossy().into_owned();
-    let preset_path = root.join("utils").join("current_preset.txt").to_string_lossy().into_owned();
+    let winws_path = root.join("exe").join("winws2.exe").to_string_lossy().into_owned();
+    let preset_path = root.join("utils").join("preset-active.txt").to_string_lossy().into_owned();
     
     let log_path = generate_log_path(&root, "start_proxy");
 

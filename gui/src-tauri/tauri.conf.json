@@ -38,6 +38,8 @@
       "../../utils/**/*",
       "../../presets/**/*",
       "../../lists/**/*",
+      "../../lua/**/*",
+      "../../windivert.filter/**/*",
       "../../service.bat"
     ]
   }
