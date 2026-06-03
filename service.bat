@@ -774,7 +774,10 @@ exit /b
 
 :: Создать XML для задачи — использует VBS для полностью скрытого запуска
 :create_task_xml
-(
+call :print_task_xml > "%BASE_DIR%\zapret2-task.xml"
+exit /b
+
+:print_task_xml
 echo ^<?xml version="1.0" encoding="UTF-16"?^>
 echo ^<Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task"^>
 echo   ^<Triggers^>
@@ -805,12 +808,14 @@ echo       ^<WorkingDirectory^>%BASE_DIR%^</WorkingDirectory^>
 echo     ^</Exec^>
 echo   ^</Actions^>
 echo ^</Task^>
-) > "%BASE_DIR%\zapret2-task.xml"
 exit /b
 
 :: Создать VBS-лаунчер если отсутствует
 :create_vbs_launcher
-(
+call :print_vbs_launcher > "%RUN_VBS%"
+exit /b
+
+:print_vbs_launcher
 echo '' zapret2-start.vbs -- hidden launcher for winws2
 echo Set WshShell = CreateObject^("WScript.Shell"^)
 echo Set fso = CreateObject^("Scripting.FileSystemObject"^)
@@ -825,7 +830,6 @@ echo Next
 echo WshShell.Run sSys32 ^& "\cmd.exe /c " ^& sSys32 ^& "\netsh.exe interface tcp set global timestamps=enabled ^>nul 2^>^&1", 0, True
 echo WScript.Sleep 500
 echo WshShell.Run sSys32 ^& "\cmd.exe /c cd /d """ ^& sRootDir ^& """ ^&^& ""exe\winws2.exe"" @""utils\preset-active.txt""", 0, False
-) > "%RUN_VBS%"
 exit /b
 
 :PrintGreen

@@ -1,4 +1,4 @@
-@echo off
+﻿@echo off
 %SystemRoot%\System32\chcp.com 65001 >nul 2>&1
 :: Автоматический подбор и установка лучшего пресета
 

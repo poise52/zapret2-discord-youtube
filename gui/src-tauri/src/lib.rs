@@ -59,7 +59,7 @@ fn start_proxy(app: tauri::AppHandle) -> Result<String, String> {
     let log_path = generate_log_path(&root, "start_proxy");
 
     let ps_script = format!(
-        "Start-Process -FilePath 'cmd.exe' -ArgumentList '/c', '\"\"{}\" @\"{}\" > \"{}\" 2>&1\"' -Verb RunAs -WindowStyle Hidden",
+        "Start-Process -FilePath 'cmd.exe' -ArgumentList '/c', 'call \"{}\" @\"{}\" > \"{}\" 2>&1' -Verb RunAs -WindowStyle Hidden",
         winws_path,
         preset_path,
         log_path
@@ -183,16 +183,16 @@ fn execute_script(app: tauri::AppHandle, command: &str) -> Result<String, String
 
     let ps_script = match command {
         "auto-setup" => {
-            format!("Start-Process -FilePath 'cmd.exe' -ArgumentList '/c', '\"\"{}\" \"silent\" > \"{}\" 2>&1\"' -Verb RunAs -WindowStyle Hidden -Wait", auto_setup_path, log_path)
+            format!("Start-Process -FilePath 'cmd.exe' -ArgumentList '/c', 'call \"{}\" \"silent\" > \"{}\" 2>&1' -Verb RunAs -WindowStyle Hidden -Wait", auto_setup_path, log_path)
         },
         "install-service" => {
-            format!("Start-Process -FilePath 'cmd.exe' -ArgumentList '/c', '\"\"{}\" \"task_install\" > \"{}\" 2>&1\"' -Verb RunAs -WindowStyle Hidden -Wait", service_bat_path, log_path)
+            format!("Start-Process -FilePath 'cmd.exe' -ArgumentList '/c', 'call \"{}\" \"task_install\" > \"{}\" 2>&1' -Verb RunAs -WindowStyle Hidden -Wait", service_bat_path, log_path)
         },
         "remove-service" => {
-            format!("Start-Process -FilePath 'cmd.exe' -ArgumentList '/c', '\"\"{}\" \"task_remove\" > \"{}\" 2>&1\"' -Verb RunAs -WindowStyle Hidden -Wait", service_bat_path, log_path)
+            format!("Start-Process -FilePath 'cmd.exe' -ArgumentList '/c', 'call \"{}\" \"task_remove\" > \"{}\" 2>&1' -Verb RunAs -WindowStyle Hidden -Wait", service_bat_path, log_path)
         },
         "update-lists" => {
-            format!("Start-Process -FilePath 'cmd.exe' -ArgumentList '/c', '\"\"{}\" \"update_lists\" > \"{}\" 2>&1\"' -Verb RunAs -WindowStyle Hidden -Wait", service_bat_path, log_path)
+            format!("Start-Process -FilePath 'cmd.exe' -ArgumentList '/c', 'call \"{}\" \"update_lists\" > \"{}\" 2>&1' -Verb RunAs -WindowStyle Hidden -Wait", service_bat_path, log_path)
         },
         _ => return Err("Unknown command".to_string()),
     };
