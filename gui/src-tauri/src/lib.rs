@@ -86,6 +86,53 @@ fn get_active_preset(app: tauri::AppHandle) -> Result<String, String> {
 }
 
 #[tauri::command]
+fn get_all_presets(app: tauri::AppHandle) -> Result<Vec<String>, String> {
+    let root = get_zapret_root(&app)?;
+    let presets_dir = root.join("presets");
+    let mut presets = Vec::new();
+    
+    if presets_dir.exists() {
+        if let Ok(entries) = std::fs::read_dir(presets_dir) {
+            for entry in entries.flatten() {
+                if let Some(ext) = entry.path().extension() {
+                    if ext == "txt" {
+                        let name = entry.path().file_stem()
+                            .unwrap_or_default()
+                            .to_string_lossy()
+                            .to_string();
+                        // Игнорируем файлы, начинающиеся с "_"
+                        if !name.starts_with('_') && !name.is_empty() {
+                            presets.push(name);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    presets.sort();
+    Ok(presets)
+}
+
+#[tauri::command]
+fn set_active_preset(app: tauri::AppHandle, name: &str) -> Result<String, String> {
+    let root = get_zapret_root(&app)?;
+    let preset_source = root.join("presets").join(format!("{}.txt", name));
+    let preset_dest = root.join("utils").join("preset-active.txt");
+    
+    if !preset_source.exists() {
+        return Err("Пресет не найден".to_string());
+    }
+    
+    std::fs::copy(&preset_source, &preset_dest).map_err(|e| e.to_string())?;
+    
+    // Обновляем current_preset.txt для service.bat
+    let state_file = root.join("utils").join("current_preset.txt");
+    let _ = std::fs::write(state_file, name);
+    
+    Ok("Пресет установлен".to_string())
+}
+
+#[tauri::command]
 fn stop_proxy() -> Result<String, String> {
     let mut cmd = Command::new("taskkill");
     cmd.args(["/F", "/IM", "winws2.exe"]);
@@ -144,7 +191,14 @@ fn execute_script(app: tauri::AppHandle, command: &str) -> Result<String, String
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![start_proxy, stop_proxy, execute_script, get_active_preset])
+        .invoke_handler(tauri::generate_handler![
+            start_proxy, 
+            stop_proxy, 
+            execute_script, 
+            get_active_preset,
+            get_all_presets,
+            set_active_preset
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

@@ -6,6 +6,8 @@ function App() {
   const [isConnected, setIsConnected] = useState(false);
   const [activeTab, setActiveTab] = useState('connect'); // 'connect' | 'manual'
   const [activePreset, setActivePreset] = useState('Загрузка...');
+  const [allPresets, setAllPresets] = useState<string[]>([]);
+  const [showPresetMenu, setShowPresetMenu] = useState(false);
   const [notification, setNotification] = useState<{message: string, isError: boolean} | null>(null);
 
   const showNotification = (message: string, isError = false) => {
@@ -17,6 +19,8 @@ function App() {
     try {
       const preset = await invoke<string>('get_active_preset');
       setActivePreset(preset);
+      const presets = await invoke<string[]>('get_all_presets');
+      setAllPresets(presets);
     } catch (e) {
       console.error(e);
       setActivePreset('01_Default');
@@ -84,6 +88,42 @@ function App() {
       <div className="main-content">
         {activeTab === 'connect' && (
           <div className="tab-connect fade-in">
+            {showPresetMenu && (
+              <div className="preset-modal-overlay" onClick={() => setShowPresetMenu(false)}>
+                <div className="preset-modal fade-in" onClick={e => e.stopPropagation()}>
+                  <div className="preset-modal-header">
+                    <h3>Выберите пресет</h3>
+                    <button className="close-btn" onClick={() => setShowPresetMenu(false)}>✕</button>
+                  </div>
+                  <div className="preset-list">
+                    {allPresets.map(p => (
+                      <div 
+                        key={p} 
+                        className={`preset-item ${p === activePreset ? 'selected' : ''}`}
+                        onClick={async () => {
+                          try {
+                            await invoke('set_active_preset', { name: p });
+                            setActivePreset(p);
+                            setShowPresetMenu(false);
+                            showNotification("Пресет изменен на " + p);
+                          } catch (e) {
+                            showNotification("Ошибка: " + e, true);
+                          }
+                        }}
+                      >
+                        {p}
+                        {p === activePreset && (
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="20 6 9 17 4 12"></polyline>
+                          </svg>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="status-badge">
               <div className={`status-dot ${isConnected ? 'active' : ''}`}></div>
               {isConnected ? 'Защита включена' : 'Защита выключена'}
@@ -101,13 +141,12 @@ function App() {
               </button>
             </div>
 
-            <div className="active-preset-box interactive" onClick={() => executeCommand('auto-setup')} title="Нажмите, чтобы запустить авто-подбор пресета">
+            <div className="active-preset-box interactive" onClick={() => setShowPresetMenu(true)} title="Нажмите, чтобы выбрать пресет">
               <div className="preset-label">ТЕКУЩИЙ ПРЕСЕТ</div>
               <div className="preset-value">
                 {activePreset}
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="23 4 23 10 17 10"></polyline>
-                  <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                  <polyline points="6 9 12 15 18 9"></polyline>
                 </svg>
               </div>
             </div>
