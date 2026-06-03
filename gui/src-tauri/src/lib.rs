@@ -59,7 +59,14 @@ fn start_proxy(app: tauri::AppHandle) -> Result<String, String> {
     let log_path = generate_log_path(&root, "start_proxy");
 
     let ps_script = format!(
-        "Start-Process -FilePath 'cmd.exe' -ArgumentList '/c', 'call \"{}\" @\"{}\" > \"{}\" 2>&1' -Verb RunAs -WindowStyle Hidden",
+        "$psi = New-Object System.Diagnostics.ProcessStartInfo; \
+         $psi.FileName = 'cmd.exe'; \
+         $psi.Arguments = '/c \"\"{}\" @\"{}\" > \"{}\" 2>&1\"'; \
+         $psi.Verb = 'RunAs'; \
+         $psi.WindowStyle = 'Hidden'; \
+         $psi.CreateNoWindow = $true; \
+         $psi.UseShellExecute = $true; \
+         [System.Diagnostics.Process]::Start($psi)",
         winws_path,
         preset_path,
         log_path
@@ -181,21 +188,26 @@ fn execute_script(app: tauri::AppHandle, command: &str) -> Result<String, String
     
     let log_path = generate_log_path(&root, command);
 
-    let ps_script = match command {
-        "auto-setup" => {
-            format!("Start-Process -FilePath 'cmd.exe' -ArgumentList '/c', 'call \"{}\" \"silent\" > \"{}\" 2>&1' -Verb RunAs -WindowStyle Hidden -Wait", auto_setup_path, log_path)
-        },
-        "install-service" => {
-            format!("Start-Process -FilePath 'cmd.exe' -ArgumentList '/c', 'call \"{}\" \"task_install\" > \"{}\" 2>&1' -Verb RunAs -WindowStyle Hidden -Wait", service_bat_path, log_path)
-        },
-        "remove-service" => {
-            format!("Start-Process -FilePath 'cmd.exe' -ArgumentList '/c', 'call \"{}\" \"task_remove\" > \"{}\" 2>&1' -Verb RunAs -WindowStyle Hidden -Wait", service_bat_path, log_path)
-        },
-        "update-lists" => {
-            format!("Start-Process -FilePath 'cmd.exe' -ArgumentList '/c', 'call \"{}\" \"update_lists\" > \"{}\" 2>&1' -Verb RunAs -WindowStyle Hidden -Wait", service_bat_path, log_path)
-        },
+    let arguments = match command {
+        "auto-setup" => format!("/c \"\"{}\" \"silent\" > \"{}\" 2>&1\"", auto_setup_path, log_path),
+        "install-service" => format!("/c \"\"{}\" \"task_install\" > \"{}\" 2>&1\"", service_bat_path, log_path),
+        "remove-service" => format!("/c \"\"{}\" \"task_remove\" > \"{}\" 2>&1\"", service_bat_path, log_path),
+        "update-lists" => format!("/c \"\"{}\" \"update_lists\" > \"{}\" 2>&1\"", service_bat_path, log_path),
         _ => return Err("Unknown command".to_string()),
     };
+
+    let ps_script = format!(
+        "$psi = New-Object System.Diagnostics.ProcessStartInfo; \
+         $psi.FileName = 'cmd.exe'; \
+         $psi.Arguments = '{}'; \
+         $psi.Verb = 'RunAs'; \
+         $psi.WindowStyle = 'Hidden'; \
+         $psi.CreateNoWindow = $true; \
+         $psi.UseShellExecute = $true; \
+         $p = [System.Diagnostics.Process]::Start($psi); \
+         if ($p) {{ $p.WaitForExit() }}",
+        arguments
+    );
 
     let mut cmd = Command::new("powershell.exe");
     cmd.args(["-NoProfile", "-Command", &ps_script]).current_dir(&root);
