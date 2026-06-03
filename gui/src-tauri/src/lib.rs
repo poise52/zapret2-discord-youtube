@@ -1,6 +1,10 @@
 use std::process::Command;
 use std::path::PathBuf;
 use std::env;
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
+
+const CREATE_NO_WINDOW: u32 = 0x08000000;
 
 use tauri::Manager;
 
@@ -40,13 +44,16 @@ fn start_proxy(app: tauri::AppHandle) -> Result<String, String> {
         preset_path = root.join("presets").join("01_Default.txt");
     }
     
-    // Запуск через cmd.exe чтобы отработал WinDivert и не висела консоль
-    let status = Command::new("cmd.exe")
-        .arg("/c")
-        .arg(format!("start /min \"\" \"{}\" @\"{}\"", root.join("exe").join("winws2.exe").display(), preset_path.display()))
-        .current_dir(&root)
-        .status()
-        .map_err(|e| e.to_string())?;
+    // Запуск через cmd.exe скрыто, без консольного окна
+    let mut cmd = Command::new("cmd.exe");
+    cmd.arg("/c")
+       .arg(format!("\"{}\" @\"{}\"", root.join("exe").join("winws2.exe").display(), preset_path.display()))
+       .current_dir(&root);
+       
+    #[cfg(target_os = "windows")]
+    cmd.creation_flags(CREATE_NO_WINDOW);
+    
+    let status = cmd.status().map_err(|e| e.to_string())?;
 
     if status.success() {
         Ok("Proxy started".to_string())
@@ -57,9 +64,13 @@ fn start_proxy(app: tauri::AppHandle) -> Result<String, String> {
 
 #[tauri::command]
 fn stop_proxy() -> Result<String, String> {
-    let _ = Command::new("taskkill")
-        .args(["/F", "/IM", "winws2.exe"])
-        .status();
+    let mut cmd = Command::new("taskkill");
+    cmd.args(["/F", "/IM", "winws2.exe"]);
+    
+    #[cfg(target_os = "windows")]
+    cmd.creation_flags(CREATE_NO_WINDOW);
+    
+    let _ = cmd.status();
         
     Ok("Proxy stopped".to_string())
 }
@@ -75,27 +86,29 @@ fn execute_script(app: tauri::AppHandle, command: &str) -> Result<String, String
 
     let (program, args) = match command {
         "auto-setup" => {
-            ("cmd.exe", vec!["/c", "start", "\"\"", auto_setup_path.as_str()])
+            ("cmd.exe", vec!["/c", auto_setup_path.as_str()])
         },
         "install-service" => {
-            // service.bat install
-            ("cmd.exe", vec!["/c", "start", "\"\"", service_bat_path.as_str(), "1"])
+            // Для установки службы нужно передавать нужные аргументы, если service.bat их поддерживает, либо использовать powershell
+            // Здесь запускаем скрыто
+            ("cmd.exe", vec!["/c", service_bat_path.as_str(), "install"])
         },
         "remove-service" => {
-            // service.bat remove
-            ("cmd.exe", vec!["/c", "start", "\"\"", service_bat_path.as_str(), "3"])
+            ("cmd.exe", vec!["/c", service_bat_path.as_str(), "remove"])
         },
         "update-lists" => {
-            ("powershell.exe", vec!["-ExecutionPolicy", "Bypass", "-File", update_lists_path.as_str()])
+            ("powershell.exe", vec!["-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass", "-File", update_lists_path.as_str()])
         },
         _ => return Err("Unknown command".to_string()),
     };
 
-    let status = Command::new(program)
-        .args(&args)
-        .current_dir(&root)
-        .status()
-        .map_err(|e| e.to_string())?;
+    let mut cmd = Command::new(program);
+    cmd.args(&args).current_dir(&root);
+    
+    #[cfg(target_os = "windows")]
+    cmd.creation_flags(CREATE_NO_WINDOW);
+    
+    let status = cmd.status().map_err(|e| e.to_string())?;
 
     if status.success() {
         Ok(format!("Executed {}", command))
