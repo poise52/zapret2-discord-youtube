@@ -1,10 +1,31 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import './App.css';
 
 function App() {
   const [isConnected, setIsConnected] = useState(false);
   const [activeTab, setActiveTab] = useState('connect'); // 'connect' | 'manual'
+  const [activePreset, setActivePreset] = useState('Загрузка...');
+  const [notification, setNotification] = useState<{message: string, isError: boolean} | null>(null);
+
+  const showNotification = (message: string, isError = false) => {
+    setNotification({ message, isError });
+    setTimeout(() => setNotification(null), 3500);
+  };
+
+  const fetchPreset = async () => {
+    try {
+      const preset = await invoke<string>('get_active_preset');
+      setActivePreset(preset);
+    } catch (e) {
+      console.error(e);
+      setActivePreset('01_Default');
+    }
+  };
+
+  useEffect(() => {
+    fetchPreset();
+  }, []);
 
   const handleConnect = async () => {
     try {
@@ -17,23 +38,36 @@ function App() {
       }
     } catch (e) {
       console.error("Ошибка переключения прокси:", e);
-      alert("Ошибка: " + e);
+      showNotification("Ошибка: " + e, true);
     }
   };
 
   const executeCommand = async (cmd: string) => {
     console.log("Executing:", cmd);
     try {
+      showNotification(`Запуск: ${cmd}...`);
       await invoke('execute_script', { command: cmd });
-      alert("Команда " + cmd + " успешно выполнена!");
+      showNotification("Успешно выполнено!");
+      
+      // Обновляем пресет, если выполнялся авто-сетап
+      if (cmd === 'auto-setup') {
+         setTimeout(fetchPreset, 1000);
+      }
     } catch (e) {
       console.error("Ошибка выполнения команды:", e);
-      alert("Ошибка: " + e);
+      showNotification("Ошибка: " + e, true);
     }
   };
 
   return (
     <div className="app-container">
+      {/* Toast Notification */}
+      {notification && (
+        <div className={`toast-notification ${notification.isError ? 'error' : ''} fade-in`}>
+          {notification.message}
+        </div>
+      )}
+
       {/* Top Header */}
       <div className="header">
         <div className="logo">
@@ -67,12 +101,13 @@ function App() {
               </button>
             </div>
 
-            <div className="active-preset-box">
+            <div className="active-preset-box interactive" onClick={() => executeCommand('auto-setup')} title="Нажмите, чтобы запустить авто-подбор пресета">
               <div className="preset-label">ТЕКУЩИЙ ПРЕСЕТ</div>
               <div className="preset-value">
-                11_General_ALT10
+                {activePreset}
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="6 9 12 15 18 9"></polyline>
+                  <polyline points="23 4 23 10 17 10"></polyline>
+                  <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
                 </svg>
               </div>
             </div>

@@ -275,3 +275,26 @@ body {
   transform: translateY(-2px);
   color: var(--accent);
 }
+
+/* Toast Notification */
+.toast-notification {
+  position: absolute;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: var(--success);
+  color: #fff;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  z-index: 1000;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  text-align: center;
+  max-width: 90%;
+  word-wrap: break-word;
+}
+
+.toast-notification.error {
+  background-color: var(--danger);
+}
