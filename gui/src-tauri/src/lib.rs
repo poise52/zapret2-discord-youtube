@@ -2,8 +2,19 @@ use std::process::Command;
 use std::path::PathBuf;
 use std::env;
 
+use tauri::Manager;
+
 // Умный поиск корневой папки Zapret2 (там где лежит winws2.exe или service.bat)
-fn get_zapret_root() -> Result<PathBuf, String> {
+fn get_zapret_root(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    // В собранном приложении ресурсы (bin, utils и т.д.) лежат в папке ресурсов Tauri
+    if let Ok(resource_path) = app.path().resource_dir() {
+        // Tauri копирует относительные пути с сохранением структуры, поэтому "../../" превращается в "_up_/_up_"
+        let bundled_root = resource_path.join("_up_").join("_up_");
+        if bundled_root.join("service.bat").exists() {
+            return Ok(bundled_root);
+        }
+    }
+
     let mut current_dir = env::current_dir().map_err(|e| e.to_string())?;
     
     // Проверяем текущую директорию и на 3 уровня вверх (для tauri dev)
@@ -20,8 +31,8 @@ fn get_zapret_root() -> Result<PathBuf, String> {
 }
 
 #[tauri::command]
-fn start_proxy() -> Result<String, String> {
-    let root = get_zapret_root()?;
+fn start_proxy(app: tauri::AppHandle) -> Result<String, String> {
+    let root = get_zapret_root(&app)?;
     
     // Читаем текущий пресет, если он есть, иначе берем дефолтный
     let mut preset_path = root.join("utils").join("preset-active.txt");
@@ -54,8 +65,8 @@ fn stop_proxy() -> Result<String, String> {
 }
 
 #[tauri::command]
-fn execute_script(command: &str) -> Result<String, String> {
-    let root = get_zapret_root()?;
+fn execute_script(app: tauri::AppHandle, command: &str) -> Result<String, String> {
+    let root = get_zapret_root(&app)?;
     
     // Сохраняем пути в String, чтобы они жили до конца функции (исправление ошибки E0716)
     let auto_setup_path = root.join("utils").join("auto-setup.bat").to_string_lossy().into_owned();
