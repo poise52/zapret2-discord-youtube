@@ -47,11 +47,17 @@ fn start_proxy(app: tauri::AppHandle) -> Result<String, String> {
         preset_path = root.join("presets").join("01_Default.txt");
     }
     
-    // Запуск через cmd.exe скрыто, без консольного окна
-    let mut cmd = Command::new("cmd.exe");
-    cmd.arg("/c")
-       .arg(format!("\"{}\" @\"{}\"", root.join("exe").join("winws2.exe").display(), preset_path.display()))
-       .current_dir(&root);
+    let exe_path = root.join("exe").join("winws2.exe").to_string_lossy().into_owned();
+    let preset = preset_path.to_string_lossy().into_owned();
+    
+    // Запуск через PowerShell с правами администратора (UAC)
+    let ps_script = format!(
+        "Start-Process -FilePath '{}' -ArgumentList '@\"{}\"' -Verb RunAs -WindowStyle Hidden",
+        exe_path, preset
+    );
+    
+    let mut cmd = Command::new("powershell.exe");
+    cmd.args(["-NoProfile", "-Command", &ps_script]).current_dir(&root);
        
     #[cfg(target_os = "windows")]
     cmd.creation_flags(CREATE_NO_WINDOW);
@@ -134,8 +140,9 @@ fn set_active_preset(app: tauri::AppHandle, name: &str) -> Result<String, String
 
 #[tauri::command]
 fn stop_proxy() -> Result<String, String> {
-    let mut cmd = Command::new("taskkill");
-    cmd.args(["/F", "/IM", "winws2.exe"]);
+    let ps_script = "Start-Process -FilePath 'taskkill.exe' -ArgumentList '/F', '/IM', 'winws2.exe' -Verb RunAs -WindowStyle Hidden";
+    let mut cmd = Command::new("powershell.exe");
+    cmd.args(["-NoProfile", "-Command", ps_script]);
     
     #[cfg(target_os = "windows")]
     cmd.creation_flags(CREATE_NO_WINDOW);
@@ -154,26 +161,24 @@ fn execute_script(app: tauri::AppHandle, command: &str) -> Result<String, String
     let service_bat_path = root.join("service.bat").to_string_lossy().into_owned();
     let update_lists_path = root.join("utils").join("update-lists.ps1").to_string_lossy().into_owned();
 
-    let (program, args) = match command {
+    let ps_script = match command {
         "auto-setup" => {
-            ("cmd.exe", vec!["/c", auto_setup_path.as_str()])
+            format!("Start-Process -FilePath 'cmd.exe' -ArgumentList '/c', '\"{}\"' -Verb RunAs -WindowStyle Hidden -Wait", auto_setup_path)
         },
         "install-service" => {
-            // Для установки службы нужно передавать нужные аргументы, если service.bat их поддерживает, либо использовать powershell
-            // Здесь запускаем скрыто
-            ("cmd.exe", vec!["/c", service_bat_path.as_str(), "install"])
+            format!("Start-Process -FilePath 'cmd.exe' -ArgumentList '/c', '\"{}\"', 'task_install' -Verb RunAs -WindowStyle Hidden -Wait", service_bat_path)
         },
         "remove-service" => {
-            ("cmd.exe", vec!["/c", service_bat_path.as_str(), "remove"])
+            format!("Start-Process -FilePath 'cmd.exe' -ArgumentList '/c', '\"{}\"', 'task_remove' -Verb RunAs -WindowStyle Hidden -Wait", service_bat_path)
         },
         "update-lists" => {
-            ("powershell.exe", vec!["-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass", "-File", update_lists_path.as_str()])
+            format!("Start-Process -FilePath 'cmd.exe' -ArgumentList '/c', '\"{}\"', 'update_lists' -Verb RunAs -WindowStyle Hidden -Wait", service_bat_path)
         },
         _ => return Err("Unknown command".to_string()),
     };
 
-    let mut cmd = Command::new(program);
-    cmd.args(&args).current_dir(&root);
+    let mut cmd = Command::new("powershell.exe");
+    cmd.args(["-NoProfile", "-Command", &ps_script]).current_dir(&root);
     
     #[cfg(target_os = "windows")]
     cmd.creation_flags(CREATE_NO_WINDOW);

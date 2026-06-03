@@ -20,9 +20,22 @@ set "TASK_NAME=Zapret2"
 set "VERSION=1.3.1"
 
 :: Внешние команды
+set "GUI_MODE=0"
 if "%~1"=="stop" (
     call :do_stop_all
     exit /b
+)
+if "%~1"=="task_install" (
+    set "GUI_MODE=1"
+    goto task_install
+)
+if "%~1"=="task_remove" (
+    set "GUI_MODE=1"
+    goto task_remove
+)
+if "%~1"=="update_lists" (
+    set "GUI_MODE=1"
+    goto run_update_lists
 )
 
 :: Проверка прав администратора
@@ -264,6 +277,10 @@ if "!PROCESS_RUNNING!"=="0" (
     )
 )
 
+if "!GUI_MODE!"=="1" (
+    timeout /t 3 >nul
+    exit /b
+)
 pause
 goto menu
 
@@ -300,6 +317,10 @@ call :cleanup_windivert
 if exist "%BASE_DIR%\zapret2-task.xml" del /f /q "%BASE_DIR%\zapret2-task.xml" >nul 2>&1
 
 echo.
+if "!GUI_MODE!"=="1" (
+    timeout /t 3 >nul
+    exit /b
+)
 pause
 goto menu
 
@@ -624,9 +645,9 @@ if "!PROCESS_RUNNING!"=="1" (
     call :PrintYellow "  winws2 запущен — будет остановлен на время тестов"
 )
 
-echo   Запускаю тесты в PowerShell...
+echo   Запускаю тесты...
 echo.
-start "" %PS_EXE% -NoProfile -ExecutionPolicy Bypass -File "%BASE_DIR%\utils\test-presets.ps1"
+%PS_EXE% -NoProfile -ExecutionPolicy Bypass -File "%BASE_DIR%\utils\test-presets.ps1"
 pause
 goto menu
 
@@ -790,13 +811,13 @@ echo WshShell.Run sSys32 ^& "\cmd.exe /c cd /d """ ^& sRootDir ^& """ ^&^& ""exe
 exit /b
 
 :PrintGreen
-%PS_EXE% -NoProfile -Command "Write-Host '%~1' -ForegroundColor Green"
+%PS_EXE% -NoProfile -Command "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; Write-Host '%~1' -ForegroundColor Green"
 exit /b
 
 :PrintRed
-%PS_EXE% -NoProfile -Command "Write-Host '%~1' -ForegroundColor Red"
+%PS_EXE% -NoProfile -Command "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; Write-Host '%~1' -ForegroundColor Red"
 exit /b
 
 :PrintYellow
-%PS_EXE% -NoProfile -Command "Write-Host '%~1' -ForegroundColor Yellow"
+%PS_EXE% -NoProfile -Command "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; Write-Host '%~1' -ForegroundColor Yellow"
 exit /b
