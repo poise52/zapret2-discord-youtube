@@ -431,3 +431,93 @@ body {
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
+
+/* Logs Tab */
+.tab-logs {
+  padding: 10px 20px;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  box-sizing: border-box;
+}
+
+.logs-container {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  gap: 15px;
+  overflow: hidden;
+  margin-top: 10px;
+}
+
+.logs-header-controls {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.log-select {
+  flex: 1;
+  background-color: var(--bg-card);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  padding: 0 12px;
+  height: 36px;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 13px;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.log-select:focus {
+  border-color: var(--accent);
+}
+
+.clear-logs-btn {
+  background-color: #ef4444;
+  color: white;
+  border: none;
+  padding: 0 15px;
+  height: 36px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: opacity 0.2s;
+  box-sizing: border-box;
+}
+
+.clear-logs-btn:hover {
+  opacity: 0.9;
+}
+
+.logs-terminal {
+  flex: 1;
+  background-color: #0d0d0d;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  margin-bottom: 20px;
+}
+
+.terminal-content {
+  flex: 1;
+  margin: 0;
+  padding: 15px;
+  color: #a9dc76;
+  font-family: 'Consolas', 'Courier New', monospace;
+  font-size: 12px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  line-height: 1.4;
+}
+
+.terminal-placeholder {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+}

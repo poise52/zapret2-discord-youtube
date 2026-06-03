@@ -8,6 +8,8 @@ use std::os::windows::process::CommandExt;
 const CREATE_NO_WINDOW: u32 = 0x08000000;
 
 use tauri::Manager;
+use tauri::command;
+use chrono::Local;
 
 // Умный поиск корневой папки Zapret2 (там где лежит winws2.exe или service.bat)
 fn get_zapret_root(app: &tauri::AppHandle) -> Result<PathBuf, String> {
@@ -37,23 +39,30 @@ fn get_zapret_root(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     Err("Не найдена корневая папка Zapret2 (service.bat не найден)".to_string())
 }
 
+fn generate_log_path(root: &PathBuf, prefix: &str) -> String {
+    let logs_dir = root.join("utils").join("logs");
+    if !logs_dir.exists() {
+        let _ = std::fs::create_dir_all(&logs_dir);
+    }
+    let timestamp = Local::now().format("%Y-%m-%d_%H-%M-%S").to_string();
+    let filename = format!("{}_{}.log", timestamp, prefix);
+    logs_dir.join(filename).to_string_lossy().into_owned()
+}
+
 #[tauri::command]
 fn start_proxy(app: tauri::AppHandle) -> Result<String, String> {
     let root = get_zapret_root(&app)?;
     
-    // Читаем текущий пресет, если он есть, иначе берем дефолтный
-    let mut preset_path = root.join("utils").join("preset-active.txt");
-    if !preset_path.exists() {
-        preset_path = root.join("presets").join("01_Default.txt");
-    }
+    let winws_path = root.join("bin").join("winws2.exe").to_string_lossy().into_owned();
+    let preset_path = root.join("utils").join("current_preset.txt").to_string_lossy().into_owned();
     
-    let exe_path = root.join("exe").join("winws2.exe").to_string_lossy().into_owned();
-    let preset = preset_path.to_string_lossy().into_owned();
-    
-    // Запуск через PowerShell с правами администратора (UAC)
+    let log_path = generate_log_path(&root, "start_proxy");
+
     let ps_script = format!(
-        "Start-Process -FilePath '{}' -ArgumentList '@\"{}\"' -Verb RunAs -WindowStyle Hidden",
-        exe_path, preset
+        "Start-Process -FilePath 'cmd.exe' -ArgumentList '/c', '\"\"{}\" @\"{}\" > \"{}\" 2>&1\"' -Verb RunAs -WindowStyle Hidden",
+        winws_path,
+        preset_path,
+        log_path
     );
     
     let mut cmd = Command::new("powershell.exe");
@@ -167,22 +176,23 @@ fn stop_proxy() -> Result<String, String> {
 fn execute_script(app: tauri::AppHandle, command: &str) -> Result<String, String> {
     let root = get_zapret_root(&app)?;
     
-    // Сохраняем пути в String, чтобы они жили до конца функции (исправление ошибки E0716)
     let auto_setup_path = root.join("utils").join("auto-setup.bat").to_string_lossy().into_owned();
     let service_bat_path = root.join("service.bat").to_string_lossy().into_owned();
+    
+    let log_path = generate_log_path(&root, command);
 
     let ps_script = match command {
         "auto-setup" => {
-            format!("Start-Process -FilePath 'cmd.exe' -ArgumentList '/c', '\"{}\"', 'silent' -Verb RunAs -WindowStyle Hidden -Wait", auto_setup_path)
+            format!("Start-Process -FilePath 'cmd.exe' -ArgumentList '/c', '\"\"{}\" \"silent\" > \"{}\" 2>&1\"' -Verb RunAs -WindowStyle Hidden -Wait", auto_setup_path, log_path)
         },
         "install-service" => {
-            format!("Start-Process -FilePath 'cmd.exe' -ArgumentList '/c', '\"{}\"', 'task_install' -Verb RunAs -WindowStyle Hidden -Wait", service_bat_path)
+            format!("Start-Process -FilePath 'cmd.exe' -ArgumentList '/c', '\"\"{}\" \"task_install\" > \"{}\" 2>&1\"' -Verb RunAs -WindowStyle Hidden -Wait", service_bat_path, log_path)
         },
         "remove-service" => {
-            format!("Start-Process -FilePath 'cmd.exe' -ArgumentList '/c', '\"{}\"', 'task_remove' -Verb RunAs -WindowStyle Hidden -Wait", service_bat_path)
+            format!("Start-Process -FilePath 'cmd.exe' -ArgumentList '/c', '\"\"{}\" \"task_remove\" > \"{}\" 2>&1\"' -Verb RunAs -WindowStyle Hidden -Wait", service_bat_path, log_path)
         },
         "update-lists" => {
-            format!("Start-Process -FilePath 'cmd.exe' -ArgumentList '/c', '\"{}\"', 'update_lists' -Verb RunAs -WindowStyle Hidden -Wait", service_bat_path)
+            format!("Start-Process -FilePath 'cmd.exe' -ArgumentList '/c', '\"\"{}\" \"update_lists\" > \"{}\" 2>&1\"' -Verb RunAs -WindowStyle Hidden -Wait", service_bat_path, log_path)
         },
         _ => return Err("Unknown command".to_string()),
     };
@@ -202,6 +212,59 @@ fn execute_script(app: tauri::AppHandle, command: &str) -> Result<String, String
     }
 }
 
+#[tauri::command]
+fn get_logs_list(app: tauri::AppHandle) -> Result<Vec<String>, String> {
+    let root = get_zapret_root(&app)?;
+    let logs_dir = root.join("utils").join("logs");
+    let mut logs = Vec::new();
+    
+    if logs_dir.exists() {
+        if let Ok(entries) = std::fs::read_dir(logs_dir) {
+            for entry in entries.flatten() {
+                if let Ok(file_type) = entry.file_type() {
+                    if file_type.is_file() {
+                        if let Some(name) = entry.file_name().to_str() {
+                            if name.ends_with(".log") {
+                                logs.push(name.to_string());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    logs.sort_by(|a, b| b.cmp(a));
+    Ok(logs)
+}
+
+#[tauri::command]
+fn read_log_file(app: tauri::AppHandle, name: String) -> Result<String, String> {
+    let root = get_zapret_root(&app)?;
+    let log_path = root.join("utils").join("logs").join(name);
+    
+    if log_path.exists() {
+        std::fs::read_to_string(log_path).map_err(|e| e.to_string())
+    } else {
+        Err("Log file not found".to_string())
+    }
+}
+
+#[tauri::command]
+fn clear_all_logs(app: tauri::AppHandle) -> Result<(), String> {
+    let root = get_zapret_root(&app)?;
+    let logs_dir = root.join("utils").join("logs");
+    
+    if logs_dir.exists() {
+        if let Ok(entries) = std::fs::read_dir(logs_dir) {
+            for entry in entries.flatten() {
+                let _ = std::fs::remove_file(entry.path());
+            }
+        }
+    }
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -213,7 +276,10 @@ pub fn run() {
             get_active_preset,
             get_all_presets,
             set_active_preset,
-            check_proxy_status
+            check_proxy_status,
+            get_logs_list,
+            read_log_file,
+            clear_all_logs
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
