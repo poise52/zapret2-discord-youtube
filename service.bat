@@ -652,6 +652,24 @@ pause
 goto menu
 
 
+:: ========== ОБНОВЛЕНИЕ СПИСКОВ ==========
+:run_update_lists
+cls
+echo.
+echo   ОБНОВЛЕНИЕ СПИСКОВ ДОМЕНОВ
+echo   ============================================
+echo.
+
+%PS_EXE% -NoProfile -ExecutionPolicy Bypass -Command "& '%BASE_DIR%\utils\update-lists.ps1' -Silent"
+
+if "!GUI_MODE!"=="1" (
+    timeout /t 3 >nul
+    exit /b
+)
+pause
+goto menu
+
+
 :: ========== TCP TIMESTAMPS ==========
 :tcp_timestamps
 cls

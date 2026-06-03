@@ -227,10 +227,15 @@ body {
   transition: all 0.2s ease;
 }
 
-.action-card:hover {
+.action-card:hover:not(.disabled) {
   background-color: var(--bg-card-hover);
   transform: translateY(-2px);
   border-color: #3f3f46;
+}
+
+.action-card.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .action-icon {
@@ -303,7 +308,7 @@ body {
 
 /* Toast Notification */
 .toast-notification {
-  position: absolute;
+  position: fixed;
   top: 20px;
   left: 50%;
   transform: translateX(-50%);
@@ -403,4 +408,26 @@ body {
   background-color: rgba(94, 106, 210, 0.15);
   color: var(--accent);
   font-weight: 500;
+}
+
+/* Loading Spinner */
+.spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  border-top-color: #fff;
+  animation: spin 1s ease-in-out infinite;
+  display: inline-block;
+}
+
+.action-icon .spinner {
+  width: 16px;
+  height: 16px;
+  border-color: rgba(94, 106, 210, 0.3);
+  border-top-color: var(--accent);
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }

@@ -15,4 +15,6 @@ echo Запуск умного авто-подбора пресетов...
 
 echo.
 echo Авто-подбор завершен. 
-timeout /t 3 /nobreak >nul
+if /i not "%~1"=="silent" (
+    timeout /t 3 /nobreak >nul
+)

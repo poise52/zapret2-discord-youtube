@@ -62,33 +62,44 @@ fn start_proxy(app: tauri::AppHandle) -> Result<String, String> {
     #[cfg(target_os = "windows")]
     cmd.creation_flags(CREATE_NO_WINDOW);
     
-    let status = cmd.status().map_err(|e| e.to_string())?;
+    // Используем spawn() чтобы не блокировать GUI, так как процесс winws2 висит бесконечно
+    let _child = cmd.spawn().map_err(|e| e.to_string())?;
 
-    if status.success() {
-        Ok("Proxy started".to_string())
-    } else {
-        Err("Failed to start proxy".to_string())
-    }
+    Ok("Proxy started".to_string())
 }
 
 #[tauri::command]
 fn get_active_preset(app: tauri::AppHandle) -> Result<String, String> {
     let root = get_zapret_root(&app)?;
-    let preset_path = root.join("utils").join("preset-active.txt");
+    let preset_name_path = root.join("utils").join("current_preset.txt");
     
-    if preset_path.exists() {
-        if let Ok(content) = std::fs::read_to_string(preset_path) {
-            let file_name = std::path::Path::new(content.trim())
-                .file_stem()
-                .unwrap_or_default()
-                .to_string_lossy()
-                .to_string();
-            if !file_name.is_empty() {
-                return Ok(file_name);
+    if preset_name_path.exists() {
+        if let Ok(content) = std::fs::read_to_string(preset_name_path) {
+            let name = content.trim().to_string();
+            if !name.is_empty() {
+                return Ok(name);
             }
         }
     }
     Ok("01_Default".to_string())
+}
+
+#[tauri::command]
+fn check_proxy_status() -> Result<bool, String> {
+    let mut cmd = Command::new("tasklist");
+    cmd.args(["/FI", "IMAGENAME eq winws2.exe"]);
+    
+    #[cfg(target_os = "windows")]
+    cmd.creation_flags(CREATE_NO_WINDOW);
+    
+    if let Ok(output) = cmd.output() {
+        let output_str = String::from_utf8_lossy(&output.stdout).to_lowercase();
+        // Если tasklist находит процесс, он выводит его имя. Если нет - выводит "info: no tasks are running..."
+        if output_str.contains("winws2.exe") {
+            return Ok(true);
+        }
+    }
+    Ok(false)
 }
 
 #[tauri::command]
@@ -159,11 +170,10 @@ fn execute_script(app: tauri::AppHandle, command: &str) -> Result<String, String
     // Сохраняем пути в String, чтобы они жили до конца функции (исправление ошибки E0716)
     let auto_setup_path = root.join("utils").join("auto-setup.bat").to_string_lossy().into_owned();
     let service_bat_path = root.join("service.bat").to_string_lossy().into_owned();
-    let update_lists_path = root.join("utils").join("update-lists.ps1").to_string_lossy().into_owned();
 
     let ps_script = match command {
         "auto-setup" => {
-            format!("Start-Process -FilePath 'cmd.exe' -ArgumentList '/c', '\"{}\"' -Verb RunAs -WindowStyle Hidden -Wait", auto_setup_path)
+            format!("Start-Process -FilePath 'cmd.exe' -ArgumentList '/c', '\"{}\"', 'silent' -Verb RunAs -WindowStyle Hidden -Wait", auto_setup_path)
         },
         "install-service" => {
             format!("Start-Process -FilePath 'cmd.exe' -ArgumentList '/c', '\"{}\"', 'task_install' -Verb RunAs -WindowStyle Hidden -Wait", service_bat_path)
@@ -202,7 +212,8 @@ pub fn run() {
             execute_script, 
             get_active_preset,
             get_all_presets,
-            set_active_preset
+            set_active_preset,
+            check_proxy_status
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -9,6 +9,8 @@ function App() {
   const [allPresets, setAllPresets] = useState<string[]>([]);
   const [showPresetMenu, setShowPresetMenu] = useState(false);
   const [notification, setNotification] = useState<{message: string, isError: boolean} | null>(null);
+  const [isCommandRunning, setIsCommandRunning] = useState(false);
+  const [isPowerToggling, setIsPowerToggling] = useState(false);
 
   const showNotification = (message: string, isError = false) => {
     setNotification({ message, isError });
@@ -27,11 +29,25 @@ function App() {
     }
   };
 
+  const checkStatus = async () => {
+    try {
+      const status = await invoke<boolean>('check_proxy_status');
+      setIsConnected(status);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   useEffect(() => {
     fetchPreset();
+    checkStatus();
+    const interval = setInterval(checkStatus, 5000);
+    return () => clearInterval(interval);
   }, []);
 
   const handleConnect = async () => {
+    if (isPowerToggling) return;
+    setIsPowerToggling(true);
     try {
       if (!isConnected) {
         await invoke('start_proxy');
@@ -43,11 +59,15 @@ function App() {
     } catch (e) {
       console.error("Ошибка переключения прокси:", e);
       showNotification("Ошибка: " + e, true);
+    } finally {
+      setIsPowerToggling(false);
     }
   };
 
   const executeCommand = async (cmd: string) => {
+    if (isCommandRunning) return;
     console.log("Executing:", cmd);
+    setIsCommandRunning(true);
     try {
       showNotification(`Запуск: ${cmd}...`);
       await invoke('execute_script', { command: cmd });
@@ -60,6 +80,8 @@ function App() {
     } catch (e) {
       console.error("Ошибка выполнения команды:", e);
       showNotification("Ошибка: " + e, true);
+    } finally {
+      setIsCommandRunning(false);
     }
   };
 
@@ -106,6 +128,12 @@ function App() {
                             setActivePreset(p);
                             setShowPresetMenu(false);
                             showNotification("Пресет изменен на " + p);
+                            
+                            // Автоматический перезапуск если прокси уже работает
+                            if (isConnected) {
+                               await invoke('stop_proxy');
+                               setTimeout(() => invoke('start_proxy'), 500);
+                            }
                           } catch (e) {
                             showNotification("Ошибка: " + e, true);
                           }
@@ -133,11 +161,16 @@ function App() {
               <button 
                 className={`power-button ${isConnected ? 'on' : 'off'}`} 
                 onClick={handleConnect}
+                disabled={isPowerToggling}
               >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path>
-                  <line x1="12" y1="2" x2="12" y2="12"></line>
-                </svg>
+                {isPowerToggling ? (
+                  <div className="spinner"></div>
+                ) : (
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path>
+                    <line x1="12" y1="2" x2="12" y2="12"></line>
+                  </svg>
+                )}
               </button>
             </div>
 
@@ -159,11 +192,13 @@ function App() {
             <p className="tab-desc">Управление службами и скриптами</p>
 
             <div className="action-list">
-              <div className="action-card" onClick={() => executeCommand('auto-setup')}>
+              <div className={`action-card ${isCommandRunning ? 'disabled' : ''}`} onClick={() => executeCommand('auto-setup')}>
                 <div className="action-icon">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
-                  </svg>
+                  {isCommandRunning ? <div className="spinner"></div> : (
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                    </svg>
+                  )}
                 </div>
                 <div className="action-text">
                   <h3>Умный авто-подбор</h3>
@@ -171,12 +206,14 @@ function App() {
                 </div>
               </div>
 
-              <div className="action-card" onClick={() => executeCommand('install-service')}>
+              <div className={`action-card ${isCommandRunning ? 'disabled' : ''}`} onClick={() => executeCommand('install-service')}>
                 <div className="action-icon">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
-                    <polyline points="22 4 12 14.01 9 11.01"></polyline>
-                  </svg>
+                  {isCommandRunning ? <div className="spinner"></div> : (
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                      <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                    </svg>
+                  )}
                 </div>
                 <div className="action-text">
                   <h3>Установить автозапуск</h3>
@@ -184,13 +221,15 @@ function App() {
                 </div>
               </div>
 
-              <div className="action-card" onClick={() => executeCommand('remove-service')}>
+              <div className={`action-card ${isCommandRunning ? 'disabled' : ''}`} onClick={() => executeCommand('remove-service')}>
                 <div className="action-icon">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="10"></circle>
-                    <line x1="15" y1="9" x2="9" y2="15"></line>
-                    <line x1="9" y1="9" x2="15" y2="15"></line>
-                  </svg>
+                  {isCommandRunning ? <div className="spinner"></div> : (
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="10"></circle>
+                      <line x1="15" y1="9" x2="9" y2="15"></line>
+                      <line x1="9" y1="9" x2="15" y2="15"></line>
+                    </svg>
+                  )}
                 </div>
                 <div className="action-text">
                   <h3>Удалить автозапуск</h3>
@@ -198,14 +237,16 @@ function App() {
                 </div>
               </div>
 
-              <div className="action-card" onClick={() => executeCommand('update-lists')}>
+              <div className={`action-card ${isCommandRunning ? 'disabled' : ''}`} onClick={() => executeCommand('update-lists')}>
                 <div className="action-icon">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M21 2v6h-6"></path>
-                    <path d="M3 12a9 9 0 0 1 15-6.7L21 8"></path>
-                    <path d="M3 22v-6h6"></path>
-                    <path d="M21 12a9 9 0 0 1-15 6.7L3 16"></path>
-                  </svg>
+                  {isCommandRunning ? <div className="spinner"></div> : (
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 2v6h-6"></path>
+                      <path d="M3 12a9 9 0 0 1 15-6.7L21 8"></path>
+                      <path d="M3 22v-6h6"></path>
+                      <path d="M21 12a9 9 0 0 1-15 6.7L3 16"></path>
+                    </svg>
+                  )}
                 </div>
                 <div className="action-text">
                   <h3>Обновить списки</h3>
