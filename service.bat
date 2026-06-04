@@ -20,9 +20,22 @@ set "TASK_NAME=Zapret2"
 set "VERSION=1.3.1"
 
 :: Внешние команды
+set "GUI_MODE=0"
 if "%~1"=="stop" (
     call :do_stop_all
     exit /b
+)
+if "%~1"=="task_install" (
+    set "GUI_MODE=1"
+    goto task_install
+)
+if "%~1"=="task_remove" (
+    set "GUI_MODE=1"
+    goto task_remove
+)
+if "%~1"=="update_lists" (
+    set "GUI_MODE=1"
+    goto run_update_lists
 )
 
 :: Проверка прав администратора
@@ -264,6 +277,10 @@ if "!PROCESS_RUNNING!"=="0" (
     )
 )
 
+if "!GUI_MODE!"=="1" (
+    timeout /t 3 >nul
+    exit /b
+)
 pause
 goto menu
 
@@ -300,6 +317,10 @@ call :cleanup_windivert
 if exist "%BASE_DIR%\zapret2-task.xml" del /f /q "%BASE_DIR%\zapret2-task.xml" >nul 2>&1
 
 echo.
+if "!GUI_MODE!"=="1" (
+    timeout /t 3 >nul
+    exit /b
+)
 pause
 goto menu
 
@@ -624,9 +645,27 @@ if "!PROCESS_RUNNING!"=="1" (
     call :PrintYellow "  winws2 запущен — будет остановлен на время тестов"
 )
 
-echo   Запускаю тесты в PowerShell...
+echo   Запускаю тесты...
 echo.
-start "" %PS_EXE% -NoProfile -ExecutionPolicy Bypass -File "%BASE_DIR%\utils\test-presets.ps1"
+%PS_EXE% -NoProfile -ExecutionPolicy Bypass -File "%BASE_DIR%\utils\test-presets.ps1"
+pause
+goto menu
+
+
+:: ========== ОБНОВЛЕНИЕ СПИСКОВ ==========
+:run_update_lists
+cls
+echo.
+echo   ОБНОВЛЕНИЕ СПИСКОВ ДОМЕНОВ
+echo   ============================================
+echo.
+
+%PS_EXE% -NoProfile -ExecutionPolicy Bypass -Command "& '%BASE_DIR%\utils\update-lists.ps1' -Silent"
+
+if "!GUI_MODE!"=="1" (
+    timeout /t 3 >nul
+    exit /b
+)
 pause
 goto menu
 
@@ -735,7 +774,10 @@ exit /b
 
 :: Создать XML для задачи — использует VBS для полностью скрытого запуска
 :create_task_xml
-(
+call :print_task_xml > "%BASE_DIR%\zapret2-task.xml"
+exit /b
+
+:print_task_xml
 echo ^<?xml version="1.0" encoding="UTF-16"?^>
 echo ^<Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task"^>
 echo   ^<Triggers^>
@@ -766,12 +808,14 @@ echo       ^<WorkingDirectory^>%BASE_DIR%^</WorkingDirectory^>
 echo     ^</Exec^>
 echo   ^</Actions^>
 echo ^</Task^>
-) > "%BASE_DIR%\zapret2-task.xml"
 exit /b
 
 :: Создать VBS-лаунчер если отсутствует
 :create_vbs_launcher
-(
+call :print_vbs_launcher > "%RUN_VBS%"
+exit /b
+
+:print_vbs_launcher
 echo '' zapret2-start.vbs -- hidden launcher for winws2
 echo Set WshShell = CreateObject^("WScript.Shell"^)
 echo Set fso = CreateObject^("Scripting.FileSystemObject"^)
@@ -786,17 +830,16 @@ echo Next
 echo WshShell.Run sSys32 ^& "\cmd.exe /c " ^& sSys32 ^& "\netsh.exe interface tcp set global timestamps=enabled ^>nul 2^>^&1", 0, True
 echo WScript.Sleep 500
 echo WshShell.Run sSys32 ^& "\cmd.exe /c cd /d """ ^& sRootDir ^& """ ^&^& ""exe\winws2.exe"" @""utils\preset-active.txt""", 0, False
-) > "%RUN_VBS%"
 exit /b
 
 :PrintGreen
-%PS_EXE% -NoProfile -Command "Write-Host '%~1' -ForegroundColor Green"
+%PS_EXE% -NoProfile -Command "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; Write-Host '%~1' -ForegroundColor Green"
 exit /b
 
 :PrintRed
-%PS_EXE% -NoProfile -Command "Write-Host '%~1' -ForegroundColor Red"
+%PS_EXE% -NoProfile -Command "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; Write-Host '%~1' -ForegroundColor Red"
 exit /b
 
 :PrintYellow
-%PS_EXE% -NoProfile -Command "Write-Host '%~1' -ForegroundColor Yellow"
+%PS_EXE% -NoProfile -Command "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; Write-Host '%~1' -ForegroundColor Yellow"
 exit /b

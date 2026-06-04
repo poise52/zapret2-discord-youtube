@@ -1,4 +1,4 @@
-@echo off
+﻿@echo off
 %SystemRoot%\System32\chcp.com 65001 >nul 2>&1
 :: Автоматический подбор и установка лучшего пресета
 
@@ -15,4 +15,6 @@ echo Запуск умного авто-подбора пресетов...
 
 echo.
 echo Авто-подбор завершен. 
-timeout /t 3 /nobreak >nul
+if /i not "%~1"=="silent" (
+    timeout /t 3 /nobreak >nul
+)

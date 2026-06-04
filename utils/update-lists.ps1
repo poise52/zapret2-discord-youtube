@@ -1,4 +1,9 @@
-# ===== ОБХОД ПОЛИТИКИ ВЫПОЛНЕНИЯ =====
+﻿[CmdletBinding()]
+param(
+    [switch]$Silent
+)
+
+# ===== ОБНОВЛЕНИЕ ПОЛИТИКИ ВЫПОЛНЕНИЯ =====
 if ($MyInvocation.Line -notmatch 'Bypass' -and $ExecutionContext.SessionState.LanguageMode -eq 'FullLanguage') {
     $currentPolicy = Get-ExecutionPolicy -Scope Process
     if ($currentPolicy -eq 'Restricted' -or $currentPolicy -eq 'AllSigned') {
@@ -37,5 +42,8 @@ try {
 
 Write-Host ""
 Write-Host "Обновление завершено." -ForegroundColor Cyan
-Write-Host "Нажмите любую клавишу для выхода..." -ForegroundColor Yellow
-[void][System.Console]::ReadKey($true)
+
+if (-not $Silent) {
+    Write-Host "Нажмите любую клавишу для выхода..." -ForegroundColor Yellow
+    [void][System.Console]::ReadKey($true)
+}
