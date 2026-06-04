@@ -415,7 +415,22 @@ function App() {
                     </div>
 
                     {selectedTestMode === 'custom' && (
-                      <div className="preset-list" style={{ maxHeight: '250px', margin: '0 10px', fontSize: '14px' }}>
+                      <>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0 15px', marginBottom: '8px' }}>
+                          <span 
+                            style={{ fontSize: '12px', color: 'var(--accent)', cursor: 'pointer', fontWeight: '500' }}
+                            onClick={() => setSelectedTestPresets([...allPresets])}
+                          >
+                            Выбрать все
+                          </span>
+                          <span 
+                            style={{ fontSize: '12px', color: 'var(--text-muted)', cursor: 'pointer', fontWeight: '500' }}
+                            onClick={() => setSelectedTestPresets([])}
+                          >
+                            Убрать все
+                          </span>
+                        </div>
+                        <div className="preset-list" style={{ maxHeight: '250px', margin: '0 10px', fontSize: '14px' }}>
                         {allPresets.map(p => (
                           <div 
                             key={p} 
@@ -434,6 +449,7 @@ function App() {
                           </div>
                         ))}
                       </div>
+                      </>
                     )}
 
                     <div style={{ padding: '15px' }}>
