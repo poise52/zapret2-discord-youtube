@@ -118,7 +118,11 @@ function App() {
     
     try {
       showNotification(`Запуск: ${cmd}...`);
-      await invoke('execute_script', { command: cmd });
+      if (cmd === 'stop-proxy') {
+        await invoke('stop_proxy');
+      } else {
+        await invoke('execute_script', { command: cmd });
+      }
       showNotification("Успешно выполнено!");
       
       // Обновляем пресет, если выполнялся авто-сетап
@@ -345,6 +349,22 @@ function App() {
                 <div className="action-text">
                   <h3>Обновить списки</h3>
                   <span>Скачать свежие базы доменов</span>
+                </div>
+              </div>
+
+              <div className={`action-card ${runningCommand !== null ? 'disabled' : ''}`} onClick={() => executeCommand('stop-proxy')}>
+                <div className="action-icon">
+                  {runningCommand !== null ? <div className="spinner"></div> : (
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                      <line x1="9" y1="9" x2="15" y2="15"></line>
+                      <line x1="15" y1="9" x2="9" y2="15"></line>
+                    </svg>
+                  )}
+                </div>
+                <div className="action-text">
+                  <h3>Остановить процесс</h3>
+                  <span>Принудительно закрыть winws2.exe</span>
                 </div>
               </div>
               </div>

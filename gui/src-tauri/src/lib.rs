@@ -50,38 +50,39 @@ fn generate_log_path(root: &PathBuf, prefix: &str) -> String {
 }
 
 #[tauri::command]
-fn start_proxy(app: tauri::AppHandle) -> Result<String, String> {
-    let root = get_zapret_root(&app)?;
-    
-    let winws_path = root.join("exe").join("winws2.exe").to_string_lossy().into_owned();
-    let preset_path = root.join("utils").join("preset-active.txt").to_string_lossy().into_owned();
-    
-    let log_path = generate_log_path(&root, "start_proxy");
+async fn start_proxy(app: tauri::AppHandle) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let root = get_zapret_root(&app)?;
+        
+        let winws_path = root.join("exe").join("winws2.exe").to_string_lossy().into_owned();
+        let preset_path = root.join("utils").join("preset-active.txt").to_string_lossy().into_owned();
+        
+        let log_path = generate_log_path(&root, "start_proxy");
 
-    let ps_script = format!(
-        "$psi = New-Object System.Diagnostics.ProcessStartInfo; \
-         $psi.FileName = 'cmd.exe'; \
-         $psi.Arguments = '/c \"\"{}\" @\"{}\" > \"{}\" 2>&1\"'; \
-         $psi.Verb = 'RunAs'; \
-         $psi.WindowStyle = 'Hidden'; \
-         $psi.CreateNoWindow = $true; \
-         $psi.UseShellExecute = $true; \
-         [System.Diagnostics.Process]::Start($psi)",
-        winws_path,
-        preset_path,
-        log_path
-    );
-    
-    let mut cmd = Command::new("powershell.exe");
-    cmd.args(["-NoProfile", "-Command", &ps_script]).current_dir(&root);
-       
-    #[cfg(target_os = "windows")]
-    cmd.creation_flags(CREATE_NO_WINDOW);
-    
-    // Используем spawn() чтобы не блокировать GUI, так как процесс winws2 висит бесконечно
-    let _child = cmd.spawn().map_err(|e| e.to_string())?;
+        let ps_script = format!(
+            "$psi = New-Object System.Diagnostics.ProcessStartInfo; \
+             $psi.FileName = 'cmd.exe'; \
+             $psi.Arguments = '/c \"\"{}\" @\"{}\" > \"{}\" 2>&1\"'; \
+             $psi.Verb = 'RunAs'; \
+             $psi.WindowStyle = 'Hidden'; \
+             $psi.CreateNoWindow = $true; \
+             $psi.UseShellExecute = $true; \
+             [System.Diagnostics.Process]::Start($psi)",
+            winws_path,
+            preset_path,
+            log_path
+        );
 
-    Ok("Proxy started".to_string())
+        let mut cmd = Command::new("powershell.exe");
+        cmd.args(["-NoProfile", "-Command", &ps_script]);
+        
+        #[cfg(target_os = "windows")]
+        cmd.creation_flags(CREATE_NO_WINDOW);
+        
+        let _ = cmd.status();
+        
+        Ok("Proxy started".to_string())
+    }).await.map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
@@ -101,21 +102,21 @@ fn get_active_preset(app: tauri::AppHandle) -> Result<String, String> {
 }
 
 #[tauri::command]
-fn check_proxy_status() -> Result<bool, String> {
-    let mut cmd = Command::new("tasklist");
-    cmd.args(["/FI", "IMAGENAME eq winws2.exe"]);
-    
-    #[cfg(target_os = "windows")]
-    cmd.creation_flags(CREATE_NO_WINDOW);
-    
-    if let Ok(output) = cmd.output() {
-        let output_str = String::from_utf8_lossy(&output.stdout).to_lowercase();
-        // Если tasklist находит процесс, он выводит его имя. Если нет - выводит "info: no tasks are running..."
-        if output_str.contains("winws2.exe") {
-            return Ok(true);
-        }
-    }
-    Ok(false)
+async fn check_proxy_status() -> Result<bool, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut cmd = Command::new("tasklist");
+        cmd.args(["/FI", "IMAGENAME eq winws2.exe"]);
+        
+        #[cfg(target_os = "windows")]
+        cmd.creation_flags(CREATE_NO_WINDOW);
+        
+        let output = cmd.output().map_err(|e| e.to_string())?;
+        let out_str = String::from_utf8_lossy(&output.stdout);
+        
+        // В Windows tasklist, если процесс не найден, выводит сообщение "INFO: No tasks are running"
+        // Поэтому мы жестко проверяем точное вхождение
+        Ok(out_str.to_lowercase().contains("winws2.exe"))
+    }).await.map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
@@ -166,7 +167,7 @@ fn set_active_preset(app: tauri::AppHandle, name: &str) -> Result<String, String
 }
 
 #[tauri::command]
-fn stop_proxy() -> Result<String, String> {
+async fn stop_proxy() -> Result<String, String> {
     let ps_script = "Start-Process -FilePath 'taskkill.exe' -ArgumentList '/F', '/IM', 'winws2.exe' -Verb RunAs -WindowStyle Hidden";
     let mut cmd = Command::new("powershell.exe");
     cmd.args(["-NoProfile", "-Command", ps_script]);
@@ -180,70 +181,75 @@ fn stop_proxy() -> Result<String, String> {
 }
 
 #[tauri::command]
-fn execute_script(app: tauri::AppHandle, command: &str) -> Result<String, String> {
-    let root = get_zapret_root(&app)?;
-    
-    let auto_setup_path = root.join("utils").join("auto-setup.bat").to_string_lossy().into_owned();
-    let service_bat_path = root.join("service.bat").to_string_lossy().into_owned();
-    
-    let log_path = generate_log_path(&root, command);
+async fn execute_script(app: tauri::AppHandle, command: String) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let command_str = command.as_str();
+        let root = get_zapret_root(&app)?;
+        
+        let auto_setup_path = root.join("utils").join("auto-setup.bat").to_string_lossy().into_owned();
+        let service_bat_path = root.join("service.bat").to_string_lossy().into_owned();
+        
+        let log_path = generate_log_path(&root, command_str);
 
-    let arguments = match command {
-        "auto-setup" => format!("/c \"\"{}\" \"silent\" > \"{}\" 2>&1\"", auto_setup_path, log_path),
-        "install-service" => format!("/c \"\"{}\" \"task_install\" > \"{}\" 2>&1\"", service_bat_path, log_path),
-        "remove-service" => format!("/c \"\"{}\" \"task_remove\" > \"{}\" 2>&1\"", service_bat_path, log_path),
-        "update-lists" => format!("/c \"\"{}\" \"update_lists\" > \"{}\" 2>&1\"", service_bat_path, log_path),
-        _ => return Err("Unknown command".to_string()),
-    };
+        let arguments = match command_str {
+            "auto-setup" => format!("/c \"\"{}\" \"silent\" > \"{}\" 2>&1\"", auto_setup_path, log_path),
+            "install-service" => format!("/c \"\"{}\" \"task_install\" > \"{}\" 2>&1\"", service_bat_path, log_path),
+            "remove-service" => format!("/c \"\"{}\" \"task_remove\" > \"{}\" 2>&1\"", service_bat_path, log_path),
+            "update-lists" => format!("/c \"\"{}\" \"update_lists\" > \"{}\" 2>&1\"", service_bat_path, log_path),
+            _ => return Err("Unknown command".to_string()),
+        };
 
-    let ps_script = format!(
-        "$psi = New-Object System.Diagnostics.ProcessStartInfo; \
-         $psi.FileName = 'cmd.exe'; \
-         $psi.Arguments = '{}'; \
-         $psi.Verb = 'RunAs'; \
-         $psi.WindowStyle = 'Hidden'; \
-         $psi.CreateNoWindow = $true; \
-         $psi.UseShellExecute = $true; \
-         $p = [System.Diagnostics.Process]::Start($psi); \
-         if ($p) {{ $p.WaitForExit() }}",
-        arguments
-    );
+        let ps_script = format!(
+            "$psi = New-Object System.Diagnostics.ProcessStartInfo; \
+             $psi.FileName = 'cmd.exe'; \
+             $psi.Arguments = '{}'; \
+             $psi.Verb = 'RunAs'; \
+             $psi.WindowStyle = 'Hidden'; \
+             $psi.CreateNoWindow = $true; \
+             $psi.UseShellExecute = $true; \
+             $p = [System.Diagnostics.Process]::Start($psi); \
+             if ($p) {{ $p.WaitForExit() }}",
+            arguments
+        );
 
-    let mut cmd = Command::new("powershell.exe");
-    cmd.args(["-NoProfile", "-Command", &ps_script]).current_dir(&root);
-    
-    #[cfg(target_os = "windows")]
-    cmd.creation_flags(CREATE_NO_WINDOW);
-    
-    let status = cmd.status().map_err(|e| e.to_string())?;
+        let mut cmd = Command::new("powershell.exe");
+        cmd.args(["-NoProfile", "-Command", &ps_script]).current_dir(&root);
+        
+        #[cfg(target_os = "windows")]
+        cmd.creation_flags(CREATE_NO_WINDOW);
+        
+        let status = cmd.status().map_err(|e| e.to_string())?;
 
-    if status.success() {
-        Ok(format!("Executed {}", command))
-    } else {
-        Err(format!("Failed to execute {}", command))
-    }
+        if status.success() {
+            Ok(format!("Executed {}", command_str))
+        } else {
+            Err(format!("Failed to execute {}", command_str))
+        }
+    }).await.map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
-fn abort_auto_setup() -> Result<String, String> {
-    // Убиваем процесс powershell, который запустил test-presets.ps1
-    let ps_script = "Get-WmiObject Win32_Process | Where-Object { $_.Name -eq 'powershell.exe' -and $_.CommandLine -like '*test-presets.ps1*' } | ForEach-Object { $_.Terminate() }";
-    let mut cmd = Command::new("powershell.exe");
-    cmd.args(["-NoProfile", "-Command", ps_script]);
-    
-    #[cfg(target_os = "windows")]
-    cmd.creation_flags(CREATE_NO_WINDOW);
-    
-    let _ = cmd.status();
-    
-    // Также на всякий случай попытаемся убить curl.exe / winws2.exe запущенные этим процессом
-    // test-presets запускает winws2.exe и curl.exe во время тестов, их тоже нужно сбросить
-    let mut kill_curl = Command::new("taskkill.exe");
-    kill_curl.args(["/F", "/IM", "curl.exe"]);
-    #[cfg(target_os = "windows")] kill_curl.creation_flags(CREATE_NO_WINDOW);
-    let _ = kill_curl.status();
-    
-    Ok("Aborted".to_string())
+async fn abort_auto_setup() -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        // Убиваем процесс powershell, который запустил test-presets.ps1
+        let ps_script = "Get-WmiObject Win32_Process | Where-Object { $_.Name -eq 'powershell.exe' -and $_.CommandLine -like '*test-presets.ps1*' } | ForEach-Object { $_.Terminate() }";
+        let mut cmd = Command::new("powershell.exe");
+        cmd.args(["-NoProfile", "-Command", ps_script]);
+        
+        #[cfg(target_os = "windows")]
+        cmd.creation_flags(CREATE_NO_WINDOW);
+        
+        let _ = cmd.status();
+        
+        // Также на всякий случай попытаемся убить curl.exe / winws2.exe запущенные этим процессом
+        // test-presets запускает winws2.exe и curl.exe во время тестов, их тоже нужно сбросить
+        let mut kill_curl = Command::new("taskkill.exe");
+        kill_curl.args(["/F", "/IM", "curl.exe"]);
+        #[cfg(target_os = "windows")] kill_curl.creation_flags(CREATE_NO_WINDOW);
+        let _ = kill_curl.status();
+        
+        Ok("Aborted".to_string())
+    }).await.map_err(|e| e.to_string())?
 }
 
 #[tauri::command]

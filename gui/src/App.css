@@ -456,6 +456,7 @@ body {
   display: flex;
   gap: 10px;
   align-items: center;
+  width: 100%;
 }
 
 .log-select {
@@ -513,7 +514,9 @@ body {
   font-family: 'Consolas', 'Courier New', monospace;
   font-size: 12px;
   overflow-y: auto;
+  overflow-x: hidden;
   white-space: pre-wrap;
+  word-break: break-all;
   line-height: 1.4;
 }
 
