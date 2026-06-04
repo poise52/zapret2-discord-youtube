@@ -1,7 +1,7 @@
 [package]
 name = "zapret2gui"
-version = "0.1.0"
-description = "GUI для zapret2"
+version = "1.0.1"
+description = "Zapret2 Windows GUI"
 authors = ["Poise52"]
 edition = "2021"
 
