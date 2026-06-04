@@ -68,3 +68,15 @@
 * Разработчику легендарного [zapret](https://github.com/bol-van/zapret) — **bol-van** за создание самого эффективного инструмента обхода DPI.
 * Автору оригинальной сборки [zapret-discord-youtube](https://github.com/Flowseal/zapret-discord-youtube) под zapret1 — **Flowseal** за структуру пресетов.
 * Разработчику [periayellowish469](https://github.com/periayellowish469/zapret2-youtube-discord) за портирование оригинальных стратегий на современный LUA-синтаксис Zapret2.
+
+## Поддержать разработчика
+
+USDT BEP `0x46922F2abf0eA51E255C6a62bC8Fb71e604Bad76` 
+
+USDT ERC `0x46922F2abf0eA51E255C6a62bC8Fb71e604Bad76` 
+
+USDT TRC `TG7rYQM4nsC293Eg7cJ1ph1kguLh1A8xCV`
+
+BTC  `bc1q5zmn5f3egeja9v9fwdjn2ld773k4sq0wv8csh3`
+
+ETH  `0x46922F2abf0eA51E255C6a62bC8Fb71e604Bad76`
