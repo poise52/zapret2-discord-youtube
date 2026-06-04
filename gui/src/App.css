@@ -461,6 +461,7 @@ body {
 
 .log-select {
   flex: 1;
+  min-width: 0;
   background-color: var(--bg-card);
   color: var(--text-primary);
   border: 1px solid var(--border);
@@ -471,6 +472,7 @@ body {
   font-size: 13px;
   outline: none;
   box-sizing: border-box;
+  text-overflow: ellipsis;
 }
 
 .log-select:focus {

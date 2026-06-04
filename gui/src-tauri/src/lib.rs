@@ -74,7 +74,7 @@ async fn start_proxy(app: tauri::AppHandle) -> Result<String, String> {
         );
 
         let mut cmd = Command::new("powershell.exe");
-        cmd.args(["-NoProfile", "-Command", &ps_script]);
+        cmd.args(["-NoProfile", "-Command", &ps_script]).current_dir(&root);
         
         #[cfg(target_os = "windows")]
         cmd.creation_flags(CREATE_NO_WINDOW);
@@ -231,8 +231,8 @@ async fn execute_script(app: tauri::AppHandle, command: String) -> Result<String
 #[tauri::command]
 async fn abort_auto_setup() -> Result<String, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        // Убиваем процесс powershell, который запустил test-presets.ps1
-        let ps_script = "Get-WmiObject Win32_Process | Where-Object { $_.Name -eq 'powershell.exe' -and $_.CommandLine -like '*test-presets.ps1*' } | ForEach-Object { $_.Terminate() }";
+        // Убиваем процесс powershell (test-presets) ИЛИ cmd.exe (service.bat update_lists)
+        let ps_script = "Get-WmiObject Win32_Process | Where-Object { ($_.Name -eq 'powershell.exe' -and $_.CommandLine -like '*test-presets.ps1*') -or ($_.Name -eq 'cmd.exe' -and $_.CommandLine -like '*service.bat*update_lists*') } | ForEach-Object { $_.Terminate() }";
         let mut cmd = Command::new("powershell.exe");
         cmd.args(["-NoProfile", "-Command", ps_script]);
         

@@ -32,15 +32,15 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "resources": [
-      "../../bin/**/*",
-      "../../exe/**/*",
-      "../../utils/**/*",
-      "../../presets/**/*",
-      "../../lists/**/*",
-      "../../lua/**/*",
-      "../../windivert.filter/**/*",
-      "../../service.bat"
-    ]
+    "resources": {
+      "../../bin/**/*": "bin/",
+      "../../exe/**/*": "exe/",
+      "../../utils/**/*": "utils/",
+      "../../presets/**/*": "presets/",
+      "../../lists/**/*": "lists/",
+      "../../lua/**/*": "lua/",
+      "../../windivert.filter/**/*": "windivert.filter/",
+      "../../service.bat": "service.bat"
+    }
   }
 }

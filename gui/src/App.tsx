@@ -114,6 +114,8 @@ function App() {
     
     if (cmd === 'auto-setup') {
       setAutoSetupLog('Запуск умного авто-подбора...\n');
+    } else if (cmd === 'update-lists') {
+      setAutoSetupLog('Запуск обновления списков...\n');
     }
     
     try {
@@ -152,13 +154,14 @@ function App() {
   };
 
   useEffect(() => {
-    if (runningCommand === 'auto-setup') {
+    if (runningCommand === 'auto-setup' || runningCommand === 'update-lists') {
       const interval = setInterval(async () => {
         try {
           const logs = await invoke<string[]>('get_logs_list');
-          const autoSetupFile = logs.find(l => l.includes('auto-setup'));
-          if (autoSetupFile) {
-            const content = await invoke<string>('read_log_file', { name: autoSetupFile });
+          const filePrefix = runningCommand === 'auto-setup' ? 'auto-setup' : 'update-lists';
+          const commandLogFile = logs.find(l => l.includes(filePrefix));
+          if (commandLogFile) {
+            const content = await invoke<string>('read_log_file', { name: commandLogFile });
             setAutoSetupLog(content);
             if (autoSetupRef.current) {
               autoSetupRef.current.scrollTop = autoSetupRef.current.scrollHeight;
@@ -276,10 +279,12 @@ function App() {
             <h2 className="tab-title">Ручная настройка</h2>
             <p className="tab-desc">Управление службами и скриптами</p>
 
-            {runningCommand === 'auto-setup' ? (
+            {runningCommand === 'auto-setup' || runningCommand === 'update-lists' ? (
               <div className="auto-setup-progress fade-in" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', marginTop: '10px' }}>
                 <div className="logs-header-controls" style={{ marginBottom: '10px' }}>
-                  <h3 style={{ flex: 1, margin: 0, fontSize: '14px' }}>Идет авто-подбор пресетов...</h3>
+                  <h3 style={{ flex: 1, margin: 0, fontSize: '14px' }}>
+                    {runningCommand === 'auto-setup' ? 'Идет авто-подбор пресетов...' : 'Идет обновление списков...'}
+                  </h3>
                   <button className="clear-logs-btn" onClick={abortAutoSetup}>Остановить (Ctrl+C)</button>
                 </div>
                 <div className="logs-terminal" style={{ margin: 0 }}>
