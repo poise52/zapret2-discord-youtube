@@ -660,7 +660,7 @@ echo   ОБНОВЛЕНИЕ СПИСКОВ ДОМЕНОВ
 echo   ============================================
 echo.
 
-%PS_EXE% -NoProfile -ExecutionPolicy Bypass -Command "& '%BASE_DIR%\utils\update-lists.ps1' -Silent"
+%PS_EXE% -NoProfile -ExecutionPolicy Bypass -Command "& '%BASE_DIR%\utils\update-lists.ps1' -Silent *>&1"
 
 if "!GUI_MODE!"=="1" (
     timeout /t 3 >nul
