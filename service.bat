@@ -37,6 +37,10 @@ if "%~1"=="update_lists" (
     set "GUI_MODE=1"
     goto run_update_lists
 )
+if "%~1"=="discord_cache" (
+    set "GUI_MODE=1"
+    goto discord_cache
+)
 
 :: Проверка прав администратора
 %SYS32%\net.exe session >nul 2>&1
@@ -626,8 +630,12 @@ for %%d in ("Cache" "Code Cache" "GPUCache") do (
 )
 
 if "!cleared!"=="0" (echo   Кэш уже чист) else (call :PrintGreen "  Кэш Discord очищен")
-
 echo.
+
+if "!GUI_MODE!"=="1" (
+    timeout /t 3 >nul
+    exit /b
+)
 pause
 goto menu
 

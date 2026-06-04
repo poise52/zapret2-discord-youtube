@@ -201,6 +201,7 @@ async fn execute_script(app: tauri::AppHandle, command: String) -> Result<String
                 "install-service" => format!("/c \"\"{}\" \"task_install\" > \"{}\" 2>&1\"", service_bat_path, log_path),
                 "remove-service" => format!("/c \"\"{}\" \"task_remove\" > \"{}\" 2>&1\"", service_bat_path, log_path),
                 "update-lists" => format!("/c \"\"{}\" \"update_lists\" > \"{}\" 2>&1\"", service_bat_path, log_path),
+                "clear-discord-cache" => format!("/c \"\"{}\" \"discord_cache\" > \"{}\" 2>&1\"", service_bat_path, log_path),
                 _ => return Err("Unknown command".to_string()),
             }
         };
