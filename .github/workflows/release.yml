@@ -1,4 +1,4 @@
-name: Release
+name: 'Release'
 
 on:
   push:
@@ -7,28 +7,39 @@ on:
 
 jobs:
   release:
-    runs-on: ubuntu-latest
     permissions:
       contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [windows-latest]
 
+    runs-on: ${{ matrix.platform }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Create ZIP Archive
-        run: |
-          TAG_NAME="${{ github.ref_name }}"
-          ARCHIVE_NAME="zapret2-discord-youtube-${TAG_NAME}.zip"
-          
-          # Упаковываем только нужные файлы и папки для запуска
-          zip -r "${ARCHIVE_NAME}" bin/ exe/ lists/ lua/ presets/ utils/ windivert.filter/ *.bat README.md LICENSE
-          
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+      - name: setup node
+        uses: actions/setup-node@v4
         with:
-          tag_name: ${{ github.ref_name }}
-          name: Release ${{ github.ref_name }}
-          draft: false
+          node-version: 20
+
+      - name: install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: install frontend dependencies
+        run: npm install
+        working-directory: ./gui
+
+      - name: build tauri app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: 'Zapret2 ${{ github.ref_name }}'
+          releaseBody: 'Автоматическая сборка GUI и скриптов.'
+          releaseDraft: false
           prerelease: false
-          files: |
-            zapret2-discord-youtube-${{ github.ref_name }}.zip
+          projectPath: './gui'

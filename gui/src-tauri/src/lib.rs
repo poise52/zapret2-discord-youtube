@@ -8,7 +8,7 @@ use std::os::windows::process::CommandExt;
 const CREATE_NO_WINDOW: u32 = 0x08000000;
 
 use tauri::Manager;
-use tauri::command;
+
 use chrono::Local;
 
 // Умный поиск корневой папки Zapret2 (там где лежит winws2.exe или service.bat)
@@ -225,6 +225,28 @@ fn execute_script(app: tauri::AppHandle, command: &str) -> Result<String, String
 }
 
 #[tauri::command]
+fn abort_auto_setup() -> Result<String, String> {
+    // Убиваем процесс powershell, который запустил test-presets.ps1
+    let ps_script = "Get-WmiObject Win32_Process | Where-Object { $_.Name -eq 'powershell.exe' -and $_.CommandLine -like '*test-presets.ps1*' } | ForEach-Object { $_.Terminate() }";
+    let mut cmd = Command::new("powershell.exe");
+    cmd.args(["-NoProfile", "-Command", ps_script]);
+    
+    #[cfg(target_os = "windows")]
+    cmd.creation_flags(CREATE_NO_WINDOW);
+    
+    let _ = cmd.status();
+    
+    // Также на всякий случай попытаемся убить curl.exe / winws2.exe запущенные этим процессом
+    // test-presets запускает winws2.exe и curl.exe во время тестов, их тоже нужно сбросить
+    let mut kill_curl = Command::new("taskkill.exe");
+    kill_curl.args(["/F", "/IM", "curl.exe"]);
+    #[cfg(target_os = "windows")] kill_curl.creation_flags(CREATE_NO_WINDOW);
+    let _ = kill_curl.status();
+    
+    Ok("Aborted".to_string())
+}
+
+#[tauri::command]
 fn get_logs_list(app: tauri::AppHandle) -> Result<Vec<String>, String> {
     let root = get_zapret_root(&app)?;
     let logs_dir = root.join("utils").join("logs");
@@ -291,7 +313,8 @@ pub fn run() {
             check_proxy_status,
             get_logs_list,
             read_log_file,
-            clear_all_logs
+            clear_all_logs,
+            abort_auto_setup
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -9,8 +9,10 @@ function App() {
   const [allPresets, setAllPresets] = useState<string[]>([]);
   const [showPresetMenu, setShowPresetMenu] = useState(false);
   const [notification, setNotification] = useState<{message: string, isError: boolean} | null>(null);
-  const [isCommandRunning, setIsCommandRunning] = useState(false);
+  const [runningCommand, setRunningCommand] = useState<string | null>(null);
   const [isPowerToggling, setIsPowerToggling] = useState(false);
+  const [autoSetupLog, setAutoSetupLog] = useState<string>('');
+  const autoSetupRef = useRef<HTMLPreElement>(null);
   
   const [logsList, setLogsList] = useState<string[]>([]);
   const [selectedLog, setSelectedLog] = useState<string | null>(null);
@@ -106,9 +108,14 @@ function App() {
   };
 
   const executeCommand = async (cmd: string) => {
-    if (isCommandRunning) return;
+    if (runningCommand) return;
     console.log("Executing:", cmd);
-    setIsCommandRunning(true);
+    setRunningCommand(cmd);
+    
+    if (cmd === 'auto-setup') {
+      setAutoSetupLog('Запуск умного авто-подбора...\n');
+    }
+    
     try {
       showNotification(`Запуск: ${cmd}...`);
       await invoke('execute_script', { command: cmd });
@@ -118,13 +125,46 @@ function App() {
       if (cmd === 'auto-setup') {
          setTimeout(fetchPreset, 1000);
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error("Ошибка выполнения команды:", e);
-      showNotification("Ошибка: " + e, true);
+      // Если прервали, не показываем как ошибку (если не хотим)
+      if (e.toString().includes("Aborted") || e.toString().includes("Failed")) {
+         showNotification("Отменено / Завершено с ошибкой", true);
+      } else {
+         showNotification("Ошибка: " + e, true);
+      }
     } finally {
-      setIsCommandRunning(false);
+      setRunningCommand(null);
     }
   };
+
+  const abortAutoSetup = async () => {
+    try {
+      showNotification("Останавливаем...");
+      await invoke('abort_auto_setup');
+    } catch (e) {
+      console.error("Failed to abort:", e);
+    }
+  };
+
+  useEffect(() => {
+    if (runningCommand === 'auto-setup') {
+      const interval = setInterval(async () => {
+        try {
+          const logs = await invoke<string[]>('get_logs_list');
+          const autoSetupFile = logs.find(l => l.includes('auto-setup'));
+          if (autoSetupFile) {
+            const content = await invoke<string>('read_log_file', { name: autoSetupFile });
+            setAutoSetupLog(content);
+            if (autoSetupRef.current) {
+              autoSetupRef.current.scrollTop = autoSetupRef.current.scrollHeight;
+            }
+          }
+        } catch (e) {}
+      }, 1500);
+      return () => clearInterval(interval);
+    }
+  }, [runningCommand]);
 
   return (
     <div className="app-container">
@@ -232,10 +272,23 @@ function App() {
             <h2 className="tab-title">Ручная настройка</h2>
             <p className="tab-desc">Управление службами и скриптами</p>
 
-            <div className="action-list">
-              <div className={`action-card ${isCommandRunning ? 'disabled' : ''}`} onClick={() => executeCommand('auto-setup')}>
+            {runningCommand === 'auto-setup' ? (
+              <div className="auto-setup-progress fade-in" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', marginTop: '10px' }}>
+                <div className="logs-header-controls" style={{ marginBottom: '10px' }}>
+                  <h3 style={{ flex: 1, margin: 0, fontSize: '14px' }}>Идет авто-подбор пресетов...</h3>
+                  <button className="clear-logs-btn" onClick={abortAutoSetup}>Остановить (Ctrl+C)</button>
+                </div>
+                <div className="logs-terminal" style={{ margin: 0 }}>
+                  <pre className="terminal-content" ref={autoSetupRef}>
+                    {autoSetupLog || 'Запуск...'}
+                  </pre>
+                </div>
+              </div>
+            ) : (
+              <div className="action-list">
+              <div className={`action-card ${runningCommand !== null ? 'disabled' : ''}`} onClick={() => executeCommand('auto-setup')}>
                 <div className="action-icon">
-                  {isCommandRunning ? <div className="spinner"></div> : (
+                  {runningCommand !== null ? <div className="spinner"></div> : (
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
                     </svg>
@@ -247,9 +300,9 @@ function App() {
                 </div>
               </div>
 
-              <div className={`action-card ${isCommandRunning ? 'disabled' : ''}`} onClick={() => executeCommand('install-service')}>
+              <div className={`action-card ${runningCommand !== null ? 'disabled' : ''}`} onClick={() => executeCommand('install-service')}>
                 <div className="action-icon">
-                  {isCommandRunning ? <div className="spinner"></div> : (
+                  {runningCommand !== null ? <div className="spinner"></div> : (
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
                       <polyline points="22 4 12 14.01 9 11.01"></polyline>
@@ -262,9 +315,9 @@ function App() {
                 </div>
               </div>
 
-              <div className={`action-card ${isCommandRunning ? 'disabled' : ''}`} onClick={() => executeCommand('remove-service')}>
+              <div className={`action-card ${runningCommand !== null ? 'disabled' : ''}`} onClick={() => executeCommand('remove-service')}>
                 <div className="action-icon">
-                  {isCommandRunning ? <div className="spinner"></div> : (
+                  {runningCommand !== null ? <div className="spinner"></div> : (
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <circle cx="12" cy="12" r="10"></circle>
                       <line x1="15" y1="9" x2="9" y2="15"></line>
@@ -278,9 +331,9 @@ function App() {
                 </div>
               </div>
 
-              <div className={`action-card ${isCommandRunning ? 'disabled' : ''}`} onClick={() => executeCommand('update-lists')}>
+              <div className={`action-card ${runningCommand !== null ? 'disabled' : ''}`} onClick={() => executeCommand('update-lists')}>
                 <div className="action-icon">
-                  {isCommandRunning ? <div className="spinner"></div> : (
+                  {runningCommand !== null ? <div className="spinner"></div> : (
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M21 2v6h-6"></path>
                       <path d="M3 12a9 9 0 0 1 15-6.7L21 8"></path>
@@ -294,7 +347,8 @@ function App() {
                   <span>Скачать свежие базы доменов</span>
                 </div>
               </div>
-            </div>
+              </div>
+            )}
           </div>
         )}
         

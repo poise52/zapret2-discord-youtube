@@ -434,11 +434,13 @@ body {
 
 /* Logs Tab */
 .tab-logs {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
   padding: 10px 20px;
   display: flex;
   flex-direction: column;
-  height: 100%;
   box-sizing: border-box;
+  overflow: hidden;
 }
 
 .logs-container {
@@ -500,6 +502,7 @@ body {
   flex-direction: column;
   overflow: hidden;
   margin-bottom: 20px;
+  min-height: 0;
 }
 
 .terminal-content {
