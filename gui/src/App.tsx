@@ -9,6 +9,9 @@ function App() {
   const [allPresets, setAllPresets] = useState<string[]>([]);
   const [showPresetMenu, setShowPresetMenu] = useState(false);
   const [notification, setNotification] = useState<{message: string, isError: boolean} | null>(null);
+  const [showAutoSetupModal, setShowAutoSetupModal] = useState(false);
+  const [selectedTestMode, setSelectedTestMode] = useState<'all' | 'custom'>('all');
+  const [selectedTestPresets, setSelectedTestPresets] = useState<string[]>([]);
   const [runningCommand, setRunningCommand] = useState<string | null>(null);
   const [isPowerToggling, setIsPowerToggling] = useState(false);
   const [autoSetupLog, setAutoSetupLog] = useState<string>('');
@@ -112,7 +115,7 @@ function App() {
     console.log("Executing:", cmd);
     setRunningCommand(cmd);
     
-    if (cmd === 'auto-setup') {
+    if (cmd.startsWith('auto-setup')) {
       setAutoSetupLog('Запуск умного авто-подбора...\n');
     } else if (cmd === 'update-lists') {
       setAutoSetupLog('Запуск обновления списков...\n');
@@ -128,7 +131,7 @@ function App() {
       showNotification("Успешно выполнено!");
       
       // Обновляем пресет, если выполнялся авто-сетап
-      if (cmd === 'auto-setup') {
+      if (cmd.startsWith('auto-setup')) {
          setTimeout(fetchPreset, 1000);
       }
     } catch (e: any) {
@@ -154,11 +157,11 @@ function App() {
   };
 
   useEffect(() => {
-    if (runningCommand === 'auto-setup' || runningCommand === 'update-lists') {
+    if (runningCommand?.startsWith('auto-setup') || runningCommand === 'update-lists') {
       const interval = setInterval(async () => {
         try {
           const logs = await invoke<string[]>('get_logs_list');
-          const filePrefix = runningCommand === 'auto-setup' ? 'auto-setup' : 'update-lists';
+          const filePrefix = runningCommand?.startsWith('auto-setup') ? 'auto-setup' : 'update-lists';
           const commandLogFile = logs.find(l => l.includes(filePrefix));
           if (commandLogFile) {
             const content = await invoke<string>('read_log_file', { name: commandLogFile });
@@ -295,7 +298,7 @@ function App() {
               </div>
             ) : (
               <div className="action-list">
-              <div className={`action-card ${runningCommand !== null ? 'disabled' : ''}`} onClick={() => executeCommand('auto-setup')}>
+              <div className={`action-card ${runningCommand !== null ? 'disabled' : ''}`} onClick={() => setShowAutoSetupModal(true)}>
                 <div className="action-icon">
                   {runningCommand !== null ? <div className="spinner"></div> : (
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -372,6 +375,72 @@ function App() {
                   <span>Принудительно закрыть winws2.exe</span>
                 </div>
               </div>
+              
+              {/* Auto-setup Modal */}
+              {showAutoSetupModal && (
+                <div className="preset-modal-overlay" onClick={() => setShowAutoSetupModal(false)}>
+                  <div className="preset-modal fade-in" onClick={e => e.stopPropagation()}>
+                    <div className="preset-modal-header">
+                      <h3>Умный авто-подбор</h3>
+                      <button className="close-btn" onClick={() => setShowAutoSetupModal(false)}>✕</button>
+                    </div>
+                    
+                    <div style={{ padding: '15px 15px 10px 15px', display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '14px' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                        <input type="radio" style={{ accentColor: 'var(--accent)' }} checked={selectedTestMode === 'all'} onChange={() => setSelectedTestMode('all')} />
+                        Все стратегии ({allPresets.length} шт.)
+                      </label>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                        <input type="radio" style={{ accentColor: 'var(--accent)' }} checked={selectedTestMode === 'custom'} onChange={() => {
+                           setSelectedTestMode('custom');
+                           setSelectedTestPresets([...allPresets]);
+                        }} />
+                        На выбор
+                      </label>
+                    </div>
+
+                    {selectedTestMode === 'custom' && (
+                      <div className="preset-list" style={{ maxHeight: '250px', margin: '0 10px', fontSize: '14px' }}>
+                        {allPresets.map(p => (
+                          <div 
+                            key={p} 
+                            className="preset-item"
+                            style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 15px' }}
+                            onClick={() => {
+                              if (selectedTestPresets.includes(p)) {
+                                 setSelectedTestPresets(selectedTestPresets.filter(x => x !== p));
+                              } else {
+                                 setSelectedTestPresets([...selectedTestPresets, p]);
+                              }
+                            }}
+                          >
+                            <span>{p}</span>
+                            <input type="checkbox" style={{ accentColor: 'var(--accent)', transform: 'scale(1.1)' }} checked={selectedTestPresets.includes(p)} readOnly />
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    <div style={{ padding: '15px' }}>
+                      <button 
+                        className="primary-button" 
+                        style={{ width: '100%', padding: '12px', fontSize: '14px', fontWeight: '600' }}
+                        disabled={selectedTestMode === 'custom' && selectedTestPresets.length === 0}
+                        onClick={() => {
+                          setShowAutoSetupModal(false);
+                          if (selectedTestMode === 'all') {
+                             executeCommand('auto-setup');
+                          } else {
+                             executeCommand('auto-setup|' + selectedTestPresets.join(','));
+                          }
+                        }}
+                      >
+                        Начать тестирование
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
               </div>
             )}
           </div>

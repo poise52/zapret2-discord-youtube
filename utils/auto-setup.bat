@@ -11,7 +11,11 @@ set "BASE_DIR=%~dp0"
 if "%BASE_DIR:~-1%"=="\" set "BASE_DIR=%BASE_DIR:~0,-1%"
 
 echo Запуск умного авто-подбора пресетов...
-%PS_EXE% -NoProfile -ExecutionPolicy Bypass -Command "& '%BASE_DIR%\test-presets.ps1' -AutoRun *>&1"
+if "%~2"=="" (
+    %PS_EXE% -NoProfile -ExecutionPolicy Bypass -Command "& '%BASE_DIR%\test-presets.ps1' -AutoRun *>&1"
+) else (
+    %PS_EXE% -NoProfile -ExecutionPolicy Bypass -Command "& '%BASE_DIR%\test-presets.ps1' -AutoRun -PresetsFilter '%~2' *>&1"
+)
 
 echo.
 echo Авто-подбор завершен. 

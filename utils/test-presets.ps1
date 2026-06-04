@@ -1,5 +1,6 @@
-﻿param(
-    [switch]$AutoRun
+param(
+    [switch]$AutoRun,
+    [string]$PresetsFilter
 )
 
 # ===== ОБХОД ПОЛИТИКИ ВЫПОЛНЕНИЯ =====
@@ -247,6 +248,12 @@ if (-not $maxNameLen -or $maxNameLen -lt 10) { $maxNameLen = 10 }
 # ===== СБОР ПРЕСЕТОВ =====
 
 $presetFiles = Get-ChildItem -Path $presetsDir -Filter "*.txt" | Where-Object { $_.Name -notlike "_*" } | Sort-Object { [Regex]::Replace($_.Name, '(\d+)', { $args[0].Value.PadLeft(8, '0') }) }
+
+if ($PresetsFilter) {
+    $filterArray = $PresetsFilter -split ","
+    $presetFiles = $presetFiles | Where-Object { $filterArray -contains $_.BaseName }
+    Write-Host "[INFO] Выбрано пресетов для тестирования: $($presetFiles.Count)" -ForegroundColor Gray
+}
 
 if ($presetFiles.Count -eq 0) {
     Write-Host "[ERROR] Пресеты не найдены в $presetsDir" -ForegroundColor Red

@@ -189,14 +189,20 @@ async fn execute_script(app: tauri::AppHandle, command: String) -> Result<String
         let auto_setup_path = root.join("utils").join("auto-setup.bat").to_string_lossy().into_owned();
         let service_bat_path = root.join("service.bat").to_string_lossy().into_owned();
         
-        let log_path = generate_log_path(&root, command_str);
+        let log_prefix = if command_str.starts_with("auto-setup") { "auto-setup" } else { command_str };
+        let log_path = generate_log_path(&root, log_prefix);
 
-        let arguments = match command_str {
-            "auto-setup" => format!("/c \"\"{}\" \"silent\" > \"{}\" 2>&1\"", auto_setup_path, log_path),
-            "install-service" => format!("/c \"\"{}\" \"task_install\" > \"{}\" 2>&1\"", service_bat_path, log_path),
-            "remove-service" => format!("/c \"\"{}\" \"task_remove\" > \"{}\" 2>&1\"", service_bat_path, log_path),
-            "update-lists" => format!("/c \"\"{}\" \"update_lists\" > \"{}\" 2>&1\"", service_bat_path, log_path),
-            _ => return Err("Unknown command".to_string()),
+        let arguments = if command_str.starts_with("auto-setup") {
+            let parts: Vec<&str> = command_str.split('|').collect();
+            let presets_arg = if parts.len() > 1 { parts[1] } else { "" };
+            format!("/c \"\"{}\" \"silent\" \"{}\" > \"{}\" 2>&1\"", auto_setup_path, presets_arg, log_path)
+        } else {
+            match command_str {
+                "install-service" => format!("/c \"\"{}\" \"task_install\" > \"{}\" 2>&1\"", service_bat_path, log_path),
+                "remove-service" => format!("/c \"\"{}\" \"task_remove\" > \"{}\" 2>&1\"", service_bat_path, log_path),
+                "update-lists" => format!("/c \"\"{}\" \"update_lists\" > \"{}\" 2>&1\"", service_bat_path, log_path),
+                _ => return Err("Unknown command".to_string()),
+            }
         };
 
         let ps_script = format!(
