@@ -54,10 +54,10 @@ async fn start_proxy(app: tauri::AppHandle) -> Result<String, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let root = get_zapret_root(&app)?;
         
-        let winws_path = root.join("exe").join("winws2.exe").to_string_lossy().into_owned();
-        let preset_path = root.join("utils").join("preset-active.txt").to_string_lossy().into_owned();
+        let winws_path = root.join("exe").join("winws2.exe").to_string_lossy().replace('\\', "/");
+        let preset_path = root.join("utils").join("preset-active.txt").to_string_lossy().replace('\\', "/");
         
-        let log_path = generate_log_path(&root, "start_proxy");
+        let log_path = generate_log_path(&root, "start_proxy").replace('\\', "/");
 
         let ps_script = format!(
             "$psi = New-Object System.Diagnostics.ProcessStartInfo; \
@@ -219,11 +219,11 @@ async fn execute_script(app: tauri::AppHandle, command: String) -> Result<String
         let command_str = command.as_str();
         let root = get_zapret_root(&app)?;
         
-        let auto_setup_path = root.join("utils").join("auto-setup.bat").to_string_lossy().into_owned();
-        let service_bat_path = root.join("service.bat").to_string_lossy().into_owned();
+        let auto_setup_path = root.join("utils").join("auto-setup.bat").to_string_lossy().replace('\\', "/");
+        let service_bat_path = root.join("service.bat").to_string_lossy().replace('\\', "/");
         
         let log_prefix = if command_str.starts_with("auto-setup") { "auto-setup" } else { command_str };
-        let log_path = generate_log_path(&root, log_prefix);
+        let log_path = generate_log_path(&root, log_prefix).replace('\\', "/");
 
         let arguments = if command_str.starts_with("auto-setup") {
             let parts: Vec<&str> = command_str.split('|').collect();
