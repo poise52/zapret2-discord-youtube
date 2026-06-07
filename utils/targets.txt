@@ -26,6 +26,10 @@ GoogleGstatic         = "https://www.gstatic.com"
 CloudflareWeb         = "https://www.cloudflare.com"
 CloudflareCDN         = "https://cdnjs.cloudflare.com"
 
+### Games & Streams
+Twitch                = "https://www.twitch.tv"
+Roblox                = "https://www.roblox.com"
+
 ### DNS (Ping only)
 CloudflareDNS         = "PING:1.1.1.1"
 GoogleDNS             = "PING:8.8.8.8"

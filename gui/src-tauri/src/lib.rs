@@ -148,7 +148,7 @@ fn get_all_presets(app: tauri::AppHandle) -> Result<Vec<String>, String> {
 }
 
 #[tauri::command]
-fn set_active_preset(app: tauri::AppHandle, name: &str) -> Result<String, String> {
+fn set_active_preset(app: tauri::AppHandle, name: &str, game_filter: Option<bool>) -> Result<String, String> {
     let root = get_zapret_root(&app)?;
     let preset_source = root.join("presets").join(format!("{}.txt", name));
     let preset_dest = root.join("utils").join("preset-active.txt");
@@ -157,7 +157,40 @@ fn set_active_preset(app: tauri::AppHandle, name: &str) -> Result<String, String
         return Err("Пресет не найден".to_string());
     }
     
-    std::fs::copy(&preset_source, &preset_dest).map_err(|e| e.to_string())?;
+    let content = std::fs::read_to_string(&preset_source).map_err(|e| e.to_string())?;
+    let mut new_content = String::new();
+    
+    if game_filter.unwrap_or(false) {
+        for line in content.lines() {
+            let mut l = line.to_string();
+            if l.starts_with("--wf-tcp-out=") && !l.contains("444-65535") {
+                l.push_str(",444-65535");
+            } else if l.starts_with("--wf-udp-out=") && !l.contains("444-65535") {
+                l.push_str(",444-65535");
+            }
+            new_content.push_str(&l);
+            new_content.push('\n');
+        }
+        
+        new_content.push_str("\n# === GameFilter UDP ===\n");
+        new_content.push_str("--filter-udp=444-65535\n");
+        new_content.push_str("  --ipset=lists/ipset-all.txt\n");
+        new_content.push_str("  --payload=all\n");
+        new_content.push_str("  --lua-desync=fake:blob=quic_google:repeats=10\n");
+        new_content.push_str("--new\n");
+        
+        new_content.push_str("\n# === GameFilter TCP ===\n");
+        new_content.push_str("--filter-tcp=444-65535\n");
+        new_content.push_str("  --ipset=lists/ipset-all.txt\n");
+        new_content.push_str("  --out-range=-n4\n");
+        new_content.push_str("  --lua-desync=fake:blob=tls_max:repeats=8:tcp_ts=-600000\n");
+        new_content.push_str("  --lua-desync=multisplit:pos=2:seqovl=664:seqovl_pattern=tls_max:repeats=8:tcp_ts=-600000\n");
+        new_content.push_str("--new\n");
+    } else {
+        new_content = content;
+    }
+    
+    std::fs::write(&preset_dest, new_content).map_err(|e| e.to_string())?;
     
     // Обновляем current_preset.txt для service.bat
     let state_file = root.join("utils").join("current_preset.txt");

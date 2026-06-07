@@ -4,7 +4,7 @@ import './App.css';
 
 const renderLogWithColors = (text: string) => {
   if (!text) return 'Файл пуст или загружается...';
-  
+
   return text.split('\n').map((line, index) => {
     let style: React.CSSProperties = {};
     if (line.includes('Zapret2 Preset Test') || line.includes('==========')) {
@@ -43,7 +43,7 @@ function App() {
   const [activePreset, setActivePreset] = useState('Загрузка...');
   const [allPresets, setAllPresets] = useState<string[]>([]);
   const [showPresetMenu, setShowPresetMenu] = useState(false);
-  const [notification, setNotification] = useState<{message: string, isError: boolean} | null>(null);
+  const [notification, setNotification] = useState<{ message: string, isError: boolean } | null>(null);
   const [showAutoSetupModal, setShowAutoSetupModal] = useState(false);
   const [selectedTestMode, setSelectedTestMode] = useState<'all' | 'custom'>('all');
   const [selectedTestPresets, setSelectedTestPresets] = useState<string[]>([]);
@@ -51,7 +51,11 @@ function App() {
   const [isPowerToggling, setIsPowerToggling] = useState(false);
   const [autoSetupLog, setAutoSetupLog] = useState<string>('');
   const autoSetupRef = useRef<HTMLPreElement>(null);
-  
+
+  const [isGameFilterEnabled, setIsGameFilterEnabled] = useState(() => {
+    return localStorage.getItem('zapret2_gamefilter') === 'true';
+  });
+
   const [logsList, setLogsList] = useState<string[]>([]);
   const [selectedLog, setSelectedLog] = useState<string | null>(null);
   const [logContent, setLogContent] = useState<string>('');
@@ -131,7 +135,7 @@ function App() {
     setIsPowerToggling(true);
     try {
       if (!isConnected) {
-        await invoke('start_proxy');
+        await invoke('start_proxy', { gameFilter: isGameFilterEnabled });
         setIsConnected(true);
       } else {
         await invoke('stop_proxy');
@@ -149,13 +153,13 @@ function App() {
     if (runningCommand) return;
     console.log("Executing:", cmd);
     setRunningCommand(cmd);
-    
+
     if (cmd.startsWith('auto-setup')) {
       setAutoSetupLog('Запуск умного авто-подбора...\n');
     } else if (cmd === 'update-lists') {
       setAutoSetupLog('Запуск обновления списков...\n');
     }
-    
+
     try {
       showNotification(`Запуск: ${cmd}...`);
       if (cmd === 'stop-proxy') {
@@ -164,18 +168,26 @@ function App() {
         await invoke('execute_script', { command: cmd });
       }
       showNotification("Успешно выполнено!");
-      
+
       // Обновляем пресет, если выполнялся авто-сетап
       if (cmd.startsWith('auto-setup')) {
-         setTimeout(fetchPreset, 1000);
+        setTimeout(async () => {
+          try {
+            const best = await invoke<string>('get_active_preset');
+            await invoke('set_active_preset', { name: best, gameFilter: isGameFilterEnabled });
+            fetchPreset();
+          } catch (err) {
+            console.error(err);
+          }
+        }, 1000);
       }
     } catch (e: any) {
       console.error("Ошибка выполнения команды:", e);
       // Если прервали, не показываем как ошибку (если не хотим)
       if (e.toString().includes("Aborted") || e.toString().includes("Failed")) {
-         showNotification("Отменено / Завершено с ошибкой", true);
+        showNotification("Отменено / Завершено с ошибкой", true);
       } else {
-         showNotification("Ошибка: " + e, true);
+        showNotification("Ошибка: " + e, true);
       }
     } finally {
       setRunningCommand(null);
@@ -205,7 +217,7 @@ function App() {
               autoSetupRef.current.scrollTop = autoSetupRef.current.scrollHeight;
             }
           }
-        } catch (e) {}
+        } catch (e) { }
       }, 1500);
       return () => clearInterval(interval);
     }
@@ -245,8 +257,8 @@ function App() {
                   </div>
                   <div className="preset-list">
                     {allPresets.map(p => (
-                      <div 
-                        key={p} 
+                      <div
+                        key={p}
                         className={`preset-item ${p === activePreset ? 'selected' : ''}`}
                         onClick={async () => {
                           try {
@@ -254,11 +266,11 @@ function App() {
                             setActivePreset(p);
                             setShowPresetMenu(false);
                             showNotification("Пресет изменен на " + p);
-                            
+
                             // Автоматический перезапуск если прокси уже работает
                             if (isConnected) {
-                               await invoke('stop_proxy');
-                               setTimeout(() => invoke('start_proxy'), 500);
+                              await invoke('stop_proxy');
+                              setTimeout(() => invoke('start_proxy', { gameFilter: isGameFilterEnabled }), 500);
                             }
                           } catch (e) {
                             showNotification("Ошибка: " + e, true);
@@ -284,8 +296,8 @@ function App() {
             </div>
 
             <div className="power-btn-container">
-              <button 
-                className={`power-button ${isConnected ? 'on' : 'off'}`} 
+              <button
+                className={`power-button ${isConnected ? 'on' : 'off'}`}
                 onClick={handleConnect}
                 disabled={isPowerToggling}
               >
@@ -309,6 +321,29 @@ function App() {
                 </svg>
               </div>
             </div>
+
+            <div className="gamefilter-toggle" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '30px', background: 'var(--card-bg)', padding: '15px 20px', borderRadius: '12px', marginTop: '15px', border: '1px solid var(--border)' }}>
+              <div>
+                <div style={{ fontSize: '14px', fontWeight: '600', color: 'var(--text)' }}>GameFilter</div>
+                <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Применяет обход DPI ко всем портам</div>
+              </div>
+              <label className="switch">
+                <input type="checkbox" checked={isGameFilterEnabled} onChange={(e) => {
+                  const newValue = e.target.checked;
+                  setIsGameFilterEnabled(newValue);
+                  localStorage.setItem('zapret2_gamefilter', String(newValue));
+                  if (isConnected) {
+                    showNotification("Применено. Перезапуск...");
+                    invoke('stop_proxy').then(() => {
+                      setTimeout(() => invoke('start_proxy', { gameFilter: newValue }), 500);
+                    });
+                  } else {
+                    showNotification(newValue ? "GameFilter включен" : "GameFilter выключен");
+                  }
+                }} />
+                <span className="slider round"></span>
+              </label>
+            </div>
           </div>
         )}
 
@@ -317,11 +352,11 @@ function App() {
             <h2 className="tab-title">Ручная настройка</h2>
             <p className="tab-desc">Управление службами и скриптами</p>
 
-            {runningCommand === 'auto-setup' || runningCommand === 'update-lists' ? (
+            {runningCommand?.startsWith('auto-setup') || runningCommand === 'update-lists' ? (
               <div className="auto-setup-progress fade-in" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', marginTop: '10px' }}>
                 <div className="logs-header-controls" style={{ marginBottom: '10px' }}>
                   <h3 style={{ flex: 1, margin: 0, fontSize: '14px' }}>
-                    {runningCommand === 'auto-setup' ? 'Идет авто-подбор пресетов...' : 'Идет обновление списков...'}
+                    {runningCommand?.startsWith('auto-setup') ? 'Идет авто-подбор пресетов...' : 'Идет обновление списков...'}
                   </h3>
                   <button className="clear-logs-btn" onClick={abortAutoSetup}>Остановить (Ctrl+C)</button>
                 </div>
@@ -333,193 +368,193 @@ function App() {
               </div>
             ) : (
               <div className="action-list">
-              <div className={`action-card ${runningCommand !== null ? 'disabled' : ''}`} onClick={() => setShowAutoSetupModal(true)}>
-                <div className="action-icon">
-                  {runningCommand !== null ? <div className="spinner"></div> : (
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
-                    </svg>
-                  )}
-                </div>
-                <div className="action-text">
-                  <h3>Умный авто-подбор</h3>
-                  <span>Тест всех пресетов и выбор лучшего</span>
-                </div>
-              </div>
-
-              <div className={`action-card ${runningCommand !== null ? 'disabled' : ''}`} onClick={() => executeCommand('install-service')}>
-                <div className="action-icon">
-                  {runningCommand !== null ? <div className="spinner"></div> : (
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
-                      <polyline points="22 4 12 14.01 9 11.01"></polyline>
-                    </svg>
-                  )}
-                </div>
-                <div className="action-text">
-                  <h3>Установить автозапуск</h3>
-                  <span>Скрытый запуск вместе с Windows</span>
-                </div>
-              </div>
-
-              <div className={`action-card ${runningCommand !== null ? 'disabled' : ''}`} onClick={() => executeCommand('remove-service')}>
-                <div className="action-icon">
-                  {runningCommand !== null ? <div className="spinner"></div> : (
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <circle cx="12" cy="12" r="10"></circle>
-                      <line x1="15" y1="9" x2="9" y2="15"></line>
-                      <line x1="9" y1="9" x2="15" y2="15"></line>
-                    </svg>
-                  )}
-                </div>
-                <div className="action-text">
-                  <h3>Удалить автозапуск</h3>
-                  <span>Удаление службы из системы</span>
-                </div>
-              </div>
-
-              <div className={`action-card ${runningCommand !== null ? 'disabled' : ''}`} onClick={() => executeCommand('update-lists')}>
-                <div className="action-icon">
-                  {runningCommand !== null ? <div className="spinner"></div> : (
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M21 2v6h-6"></path>
-                      <path d="M3 12a9 9 0 0 1 15-6.7L21 8"></path>
-                      <path d="M3 22v-6h6"></path>
-                      <path d="M21 12a9 9 0 0 1-15 6.7L3 16"></path>
-                    </svg>
-                  )}
-                </div>
-                <div className="action-text">
-                  <h3>Обновить списки</h3>
-                  <span>Скачать свежие базы доменов</span>
-                </div>
-              </div>
-
-              <div className={`action-card ${runningCommand !== null ? 'disabled' : ''}`} onClick={() => executeCommand('stop-proxy')}>
-                <div className="action-icon">
-                  {runningCommand !== null ? <div className="spinner"></div> : (
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                      <line x1="9" y1="9" x2="15" y2="15"></line>
-                      <line x1="15" y1="9" x2="9" y2="15"></line>
-                    </svg>
-                  )}
-                </div>
-                <div className="action-text">
-                  <h3>Остановить процесс</h3>
-                  <span>Принудительно закрыть winws2.exe</span>
-                </div>
-              </div>
-
-              <div className={`action-card ${runningCommand !== null ? 'disabled' : ''}`} onClick={() => executeCommand('clear-discord-cache')}>
-                <div className="action-icon">
-                  {runningCommand !== null ? <div className="spinner"></div> : (
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M3 6h18"></path>
-                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                    </svg>
-                  )}
-                </div>
-                <div className="action-text">
-                  <h3>Очистить кэш Discord</h3>
-                  <span>Решение проблем с загрузкой в Discord</span>
-                </div>
-              </div>
-              
-              {/* Auto-setup Modal */}
-              {showAutoSetupModal && (
-                <div className="preset-modal-overlay" onClick={() => setShowAutoSetupModal(false)}>
-                  <div className="preset-modal fade-in" onClick={e => e.stopPropagation()}>
-                    <div className="preset-modal-header">
-                      <h3>Умный авто-подбор</h3>
-                      <button className="close-btn" onClick={() => setShowAutoSetupModal(false)}>✕</button>
-                    </div>
-                    
-                    <div style={{ padding: '15px 15px 10px 15px', display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '14px' }}>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                        <input type="radio" style={{ accentColor: 'var(--accent)' }} checked={selectedTestMode === 'all'} onChange={() => setSelectedTestMode('all')} />
-                        Все стратегии ({allPresets.length} шт.)
-                      </label>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                        <input type="radio" style={{ accentColor: 'var(--accent)' }} checked={selectedTestMode === 'custom'} onChange={() => {
-                           setSelectedTestMode('custom');
-                           setSelectedTestPresets([...allPresets]);
-                        }} />
-                        На выбор
-                      </label>
-                    </div>
-
-                    {selectedTestMode === 'custom' && (
-                      <>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0 15px', marginBottom: '8px' }}>
-                          <span 
-                            style={{ fontSize: '12px', color: 'var(--accent)', cursor: 'pointer', fontWeight: '500' }}
-                            onClick={() => setSelectedTestPresets([...allPresets])}
-                          >
-                            Выбрать все
-                          </span>
-                          <span 
-                            style={{ fontSize: '12px', color: 'var(--text-muted)', cursor: 'pointer', fontWeight: '500' }}
-                            onClick={() => setSelectedTestPresets([])}
-                          >
-                            Убрать все
-                          </span>
-                        </div>
-                        <div className="preset-list" style={{ maxHeight: '250px', margin: '0 10px', fontSize: '14px' }}>
-                        {allPresets.map(p => (
-                          <div 
-                            key={p} 
-                            className="preset-item"
-                            style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 15px' }}
-                            onClick={() => {
-                              if (selectedTestPresets.includes(p)) {
-                                 setSelectedTestPresets(selectedTestPresets.filter(x => x !== p));
-                              } else {
-                                 setSelectedTestPresets([...selectedTestPresets, p]);
-                              }
-                            }}
-                          >
-                            <span>{p}</span>
-                            <input type="checkbox" style={{ accentColor: 'var(--accent)', transform: 'scale(1.1)' }} checked={selectedTestPresets.includes(p)} readOnly />
-                          </div>
-                        ))}
-                      </div>
-                      </>
+                <div className={`action-card ${runningCommand !== null ? 'disabled' : ''}`} onClick={() => setShowAutoSetupModal(true)}>
+                  <div className="action-icon">
+                    {runningCommand !== null ? <div className="spinner"></div> : (
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                      </svg>
                     )}
-
-                    <div style={{ padding: '15px' }}>
-                      <button 
-                        className="primary-button" 
-                        style={{ width: '100%', padding: '12px', fontSize: '14px', fontWeight: '600' }}
-                        disabled={selectedTestMode === 'custom' && selectedTestPresets.length === 0}
-                        onClick={() => {
-                          setShowAutoSetupModal(false);
-                          if (selectedTestMode === 'all') {
-                             executeCommand('auto-setup');
-                          } else {
-                             executeCommand('auto-setup|' + selectedTestPresets.join(','));
-                          }
-                        }}
-                      >
-                        Начать тестирование
-                      </button>
-                    </div>
+                  </div>
+                  <div className="action-text">
+                    <h3>Умный авто-подбор</h3>
+                    <span>Тест всех пресетов и выбор лучшего</span>
                   </div>
                 </div>
-              )}
+
+                <div className={`action-card ${runningCommand !== null ? 'disabled' : ''}`} onClick={() => executeCommand('install-service')}>
+                  <div className="action-icon">
+                    {runningCommand !== null ? <div className="spinner"></div> : (
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                        <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                      </svg>
+                    )}
+                  </div>
+                  <div className="action-text">
+                    <h3>Установить автозапуск</h3>
+                    <span>Скрытый запуск вместе с Windows</span>
+                  </div>
+                </div>
+
+                <div className={`action-card ${runningCommand !== null ? 'disabled' : ''}`} onClick={() => executeCommand('remove-service')}>
+                  <div className="action-icon">
+                    {runningCommand !== null ? <div className="spinner"></div> : (
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="15" y1="9" x2="9" y2="15"></line>
+                        <line x1="9" y1="9" x2="15" y2="15"></line>
+                      </svg>
+                    )}
+                  </div>
+                  <div className="action-text">
+                    <h3>Удалить автозапуск</h3>
+                    <span>Удаление службы из системы</span>
+                  </div>
+                </div>
+
+                <div className={`action-card ${runningCommand !== null ? 'disabled' : ''}`} onClick={() => executeCommand('update-lists')}>
+                  <div className="action-icon">
+                    {runningCommand !== null ? <div className="spinner"></div> : (
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M21 2v6h-6"></path>
+                        <path d="M3 12a9 9 0 0 1 15-6.7L21 8"></path>
+                        <path d="M3 22v-6h6"></path>
+                        <path d="M21 12a9 9 0 0 1-15 6.7L3 16"></path>
+                      </svg>
+                    )}
+                  </div>
+                  <div className="action-text">
+                    <h3>Обновить списки</h3>
+                    <span>Скачать свежие базы доменов</span>
+                  </div>
+                </div>
+
+                <div className={`action-card ${runningCommand !== null ? 'disabled' : ''}`} onClick={() => executeCommand('stop-proxy')}>
+                  <div className="action-icon">
+                    {runningCommand !== null ? <div className="spinner"></div> : (
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                        <line x1="9" y1="9" x2="15" y2="15"></line>
+                        <line x1="15" y1="9" x2="9" y2="15"></line>
+                      </svg>
+                    )}
+                  </div>
+                  <div className="action-text">
+                    <h3>Остановить процесс</h3>
+                    <span>Принудительно закрыть winws2.exe</span>
+                  </div>
+                </div>
+
+                <div className={`action-card ${runningCommand !== null ? 'disabled' : ''}`} onClick={() => executeCommand('clear-discord-cache')}>
+                  <div className="action-icon">
+                    {runningCommand !== null ? <div className="spinner"></div> : (
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M3 6h18"></path>
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                      </svg>
+                    )}
+                  </div>
+                  <div className="action-text">
+                    <h3>Очистить кэш Discord</h3>
+                    <span>Решение проблем с загрузкой в Discord</span>
+                  </div>
+                </div>
+
+                {/* Auto-setup Modal */}
+                {showAutoSetupModal && (
+                  <div className="preset-modal-overlay" onClick={() => setShowAutoSetupModal(false)}>
+                    <div className="preset-modal fade-in" onClick={e => e.stopPropagation()}>
+                      <div className="preset-modal-header">
+                        <h3>Умный авто-подбор</h3>
+                        <button className="close-btn" onClick={() => setShowAutoSetupModal(false)}>✕</button>
+                      </div>
+
+                      <div style={{ padding: '15px 15px 10px 15px', display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '14px' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                          <input type="radio" style={{ accentColor: 'var(--accent)' }} checked={selectedTestMode === 'all'} onChange={() => setSelectedTestMode('all')} />
+                          Все стратегии ({allPresets.length} шт.)
+                        </label>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                          <input type="radio" style={{ accentColor: 'var(--accent)' }} checked={selectedTestMode === 'custom'} onChange={() => {
+                            setSelectedTestMode('custom');
+                            setSelectedTestPresets([...allPresets]);
+                          }} />
+                          На выбор
+                        </label>
+                      </div>
+
+                      {selectedTestMode === 'custom' && (
+                        <>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0 15px', marginBottom: '8px' }}>
+                            <span
+                              style={{ fontSize: '12px', color: 'var(--accent)', cursor: 'pointer', fontWeight: '500' }}
+                              onClick={() => setSelectedTestPresets([...allPresets])}
+                            >
+                              Выбрать все
+                            </span>
+                            <span
+                              style={{ fontSize: '12px', color: 'var(--text-muted)', cursor: 'pointer', fontWeight: '500' }}
+                              onClick={() => setSelectedTestPresets([])}
+                            >
+                              Убрать все
+                            </span>
+                          </div>
+                          <div className="preset-list" style={{ maxHeight: '250px', margin: '0 10px', fontSize: '14px' }}>
+                            {allPresets.map(p => (
+                              <div
+                                key={p}
+                                className="preset-item"
+                                style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 15px' }}
+                                onClick={() => {
+                                  if (selectedTestPresets.includes(p)) {
+                                    setSelectedTestPresets(selectedTestPresets.filter(x => x !== p));
+                                  } else {
+                                    setSelectedTestPresets([...selectedTestPresets, p]);
+                                  }
+                                }}
+                              >
+                                <span>{p}</span>
+                                <input type="checkbox" style={{ accentColor: 'var(--accent)', transform: 'scale(1.1)' }} checked={selectedTestPresets.includes(p)} readOnly />
+                              </div>
+                            ))}
+                          </div>
+                        </>
+                      )}
+
+                      <div style={{ padding: '15px' }}>
+                        <button
+                          className="primary-button"
+                          style={{ width: '100%', padding: '12px', fontSize: '14px', fontWeight: '600' }}
+                          disabled={selectedTestMode === 'custom' && selectedTestPresets.length === 0}
+                          onClick={() => {
+                            setShowAutoSetupModal(false);
+                            if (selectedTestMode === 'all') {
+                              executeCommand('auto-setup');
+                            } else {
+                              executeCommand('auto-setup|' + selectedTestPresets.join(','));
+                            }
+                          }}
+                        >
+                          Начать тестирование
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
         )}
-        
+
         {activeTab === 'logs' && (
           <div className="tab-logs fade-in">
             <h2 className="tab-title">Терминал (Логи)</h2>
             <div className="logs-container">
               <div className="logs-header-controls">
-                <select 
-                  className="log-select" 
-                  value={selectedLog || ''} 
+                <select
+                  className="log-select"
+                  value={selectedLog || ''}
                   onChange={(e) => {
                     setSelectedLog(e.target.value);
                     setLogContent('Загрузка...');
@@ -559,7 +594,7 @@ function App() {
 
       {/* Bottom Tab Navigation */}
       <div className="bottom-nav">
-        <button 
+        <button
           className={`nav-btn ${activeTab === 'connect' ? 'active' : ''}`}
           onClick={() => setActiveTab('connect')}
         >
@@ -569,7 +604,7 @@ function App() {
           </svg>
           <span>Подключение</span>
         </button>
-        <button 
+        <button
           className={`nav-btn ${activeTab === 'manual' ? 'active' : ''}`}
           onClick={() => setActiveTab('manual')}
         >
@@ -579,7 +614,7 @@ function App() {
           </svg>
           <span>Настройки</span>
         </button>
-        <button 
+        <button
           className={`nav-btn ${activeTab === 'logs' ? 'active' : ''}`}
           onClick={() => setActiveTab('logs')}
         >

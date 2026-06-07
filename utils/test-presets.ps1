@@ -70,12 +70,12 @@ function Start-Winws2 {
             return $null
         }
     }
-    Start-Sleep -Seconds 4
+    Start-Sleep -Seconds 1.5
     return $proc
 }
 
 function Test-Targets {
-    param([array]$TargetList, [int]$TimeoutSec = 5, [int]$MaxParallel = 8)
+    param([array]$TargetList, [int]$TimeoutSec = 3, [int]$MaxParallel = 8)
 
     $runspacePool = [runspacefactory]::CreateRunspacePool(1, $MaxParallel)
     $runspacePool.Open()
@@ -128,7 +128,7 @@ function Test-Targets {
         $pingResult = "n/a"
         if ($t.PingTarget) {
             try {
-                $pings = Test-Connection -ComputerName $t.PingTarget -Count 2 -ErrorAction Stop
+                $pings = Test-Connection -ComputerName $t.PingTarget -Count 1 -ErrorAction Stop
                 $avg = ($pings | Measure-Object -Property ResponseTime -Average).Average
                 $pingResult = "{0:N0}ms" -f $avg
             } catch {
