@@ -1,0 +1,92 @@
+# Preset: ALT (fake+fakedsplit)
+# Description: Стратегия fake+fakedsplit с tcp_ts fooling. Работает у многих провайдеров.
+# Origin: Flowseal general (ALT) → zapret2 v1.0.1
+# BuiltinVersion: v1.0.1
+
+--lua-init=@lua/zapret-lib.lua
+--lua-init=@lua/zapret-antidpi.lua
+--lua-init=@lua/zapret-auto.lua
+
+--blob=quic_google:@bin/quic_initial_www_google_com.bin
+--blob=tls_google:@bin/tls_clienthello_www_google_com.bin
+
+--wf-tcp-out=80,443,2053,2083,2087,2096,8443
+--wf-udp-out=443,19294-19344,50000-50100
+--wf-raw-part=@windivert.filter/windivert_part.discord_media.txt
+--wf-raw-part=@windivert.filter/windivert_part.stun.txt
+--wf-raw-part=@windivert.filter/windivert_part.wireguard.txt
+
+# === QUIC (YouTube + general) ===
+--filter-udp=443
+  --payload=quic_initial
+  --lua-desync=fake:blob=quic_google:repeats=6
+
+--new
+
+# === Discord/STUN UDP ===
+--filter-l7=discord,stun
+  --payload=stun,discord_ip_discovery
+  --lua-desync=fake:blob=0x00000000000000000000000000000000:repeats=6
+
+--new
+
+# === Discord media TLS ===
+--filter-tcp=80,443,1080,2053,2083,2087,2096,8443
+  --hostlist-domains=discord.media
+  --out-range=-d10
+  --payload=tls_client_hello
+  --lua-desync=fake:blob=tls_google:repeats=6:tcp_ts=-600000
+  --lua-desync=fakedsplit:pattern=0x00:repeats=6:tcp_ts=-600000
+
+--new
+
+# === YouTube TLS ===
+--filter-tcp=80,443
+  --hostlist=lists/youtube.txt
+  --out-range=-d8
+  --payload=tls_client_hello
+  --lua-desync=fake:blob=tls_google:repeats=6:tcp_ts=-600000
+  --lua-desync=fakedsplit:pattern=0x00:repeats=6:tcp_ts=-600000
+
+--new
+
+# === Discord + Other sites TLS ===
+--filter-tcp=80,443,1080,2053,2083,2087,2096,8443
+  --hostlist=lists/discord.txt
+  --hostlist=lists/other.txt
+  --hostlist=lists/facebook.txt
+  --hostlist=lists/instagram.txt
+  --hostlist=lists/twitter.txt
+  --out-range=-d10
+  --payload=tls_client_hello
+  --lua-desync=fake:blob=tls_google:repeats=6:tcp_ts=-600000
+  --lua-desync=fakedsplit:pattern=0x00:repeats=6:tcp_ts=-600000
+
+--new
+
+# === General list TLS ===
+--filter-tcp=80,443
+  --hostlist=lists/list-general.txt
+  --payload=tls_client_hello
+  --lua-desync=fake:blob=tls_google:repeats=6:tcp_ts=-600000
+  --lua-desync=fakedsplit:pattern=0x00:repeats=6:tcp_ts=-600000
+
+--new
+
+# === Fallback QUIC by ipset ===
+--filter-udp=443
+  --ipset=lists/ipset-all.txt
+  --payload=quic_initial
+  --lua-desync=fake:blob=quic_google:repeats=6
+
+--new
+
+# === Fallback TCP by ipset ===
+--filter-tcp=80,443
+  --ipset=lists/ipset-all.txt
+  --payload=tls_client_hello
+  --lua-desync=fake:blob=tls_google:repeats=6:tcp_ts=-600000
+  --payload=http_req
+  --lua-desync=fake:blob=fake_default_http:repeats=6:tcp_ts=-600000
+  --payload=tls_client_hello,http_req
+  --lua-desync=fakedsplit:pattern=0x00:repeats=6:tcp_ts=-600000
