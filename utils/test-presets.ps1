@@ -1,4 +1,4 @@
-﻿param(
+param(
     [switch]$AutoRun,
     [string]$PresetsFilter
 )
@@ -446,7 +446,7 @@ try {
     # Сохранение результатов
     $dateStr = Get-Date -Format "yyyy-MM-dd_HH-mm-ss"
     $resultFile = Join-Path $resultsDir "test_$dateStr.txt"
-    $reportLines = @("Zapret2 Preset Test - $dateStr", "=" * 60, "")
+    $reportLines = @("Zapret2 Preset Test - $dateStr", "============================================================", "")
 
     foreach ($res in $globalResults) {
         $reportLines += "Пресет: $($res.Preset)"

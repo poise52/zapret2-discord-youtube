@@ -15,7 +15,9 @@
         "title": "Zapret2",
         "width": 380,
         "height": 720,
-        "resizable": false
+        "minWidth": 380,
+        "minHeight": 720,
+        "resizable": true
       }
     ],
     "security": {

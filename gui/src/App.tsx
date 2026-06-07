@@ -2,6 +2,41 @@ import { useState, useEffect, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import './App.css';
 
+const renderLogWithColors = (text: string) => {
+  if (!text) return 'Файл пуст или загружается...';
+  
+  return text.split('\n').map((line, index) => {
+    let style: React.CSSProperties = {};
+    if (line.includes('Zapret2 Preset Test') || line.includes('==========')) {
+      style.color = '#06b6d4';
+    } else if (line.includes('[AUTO]')) {
+      style.color = '#d946ef';
+    } else if (line.includes('[ERROR]') || line.includes('НЕ ЗАПУСТИЛСЯ') || line.includes('Cannot convert')) {
+      style.color = '#ef4444';
+    } else if (line.includes('[INFO]')) {
+      style.color = '#9ca3af';
+    } else if (line.includes('Лучший пресет:')) {
+      style.color = '#22c55e';
+    } else if (line.match(/\[\d+\/\d+\]/)) {
+      style.color = '#eab308';
+    }
+
+    const tokens = line.split(/(OK=\d+|FAIL=\d+|UNSUP=\d+|OK\s+|FAIL\s+|UNSUP\s+|ERR\s+|Ping:\s*\d+ms|Ping:\s*Timeout|Ping=\d+\/\d+)/g);
+
+    return (
+      <div key={index} style={style}>
+        {tokens.map((token, idx) => {
+          if (token.startsWith('OK')) return <span key={idx} style={{ color: '#22c55e' }}>{token}</span>;
+          if (token.startsWith('FAIL') || token.startsWith('ERR') || token.includes('Timeout')) return <span key={idx} style={{ color: '#ef4444' }}>{token}</span>;
+          if (token.startsWith('UNSUP')) return <span key={idx} style={{ color: '#eab308' }}>{token}</span>;
+          if (token.startsWith('Ping:') && !token.includes('Timeout')) return <span key={idx} style={{ color: '#06b6d4' }}>{token}</span>;
+          return <span key={idx}>{token}</span>;
+        })}
+      </div>
+    );
+  });
+};
+
 function App() {
   const [isConnected, setIsConnected] = useState(false);
   const [activeTab, setActiveTab] = useState('connect'); // 'connect' | 'manual'
@@ -292,7 +327,7 @@ function App() {
                 </div>
                 <div className="logs-terminal" style={{ margin: 0 }}>
                   <pre className="terminal-content" ref={autoSetupRef}>
-                    {autoSetupLog || 'Запуск...'}
+                    {autoSetupLog ? renderLogWithColors(autoSetupLog) : 'Запуск...'}
                   </pre>
                 </div>
               </div>
@@ -511,7 +546,7 @@ function App() {
               <div className="logs-terminal">
                 {selectedLog ? (
                   <pre className="terminal-content" ref={terminalRef}>
-                    {logContent || 'Файл пуст или загружается...'}
+                    {logContent ? renderLogWithColors(logContent) : 'Файл пуст или загружается...'}
                   </pre>
                 ) : (
                   <div className="terminal-placeholder">Выберите лог в меню выше</div>
